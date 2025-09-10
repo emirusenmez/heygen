@@ -1,0 +1,7 @@
+2025/08/13-14:23:44.004 4a64 Reusing MANIFEST c:\Users\emir.usenmez\Contacts\heygen\chrome_automation_profile\Default\IndexedDB\https_app.heygen.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/08/13-14:23:44.005 4a64 Recovering log #3
+2025/08/13-14:23:44.007 4a64 Reusing old log c:\Users\emir.usenmez\Contacts\heygen\chrome_automation_profile\Default\IndexedDB\https_app.heygen.com_0.indexeddb.leveldb/000003.log 
+2025/08/13-14:37:42.904 3a1c Level-0 table #5: started
+2025/08/13-14:37:42.911 3a1c Level-0 table #5: 33645 bytes OK
+2025/08/13-14:37:42.914 3a1c Delete type=0 #3
+2025/08/13-14:37:42.915 3a1c Manual compaction at level-0 from (begin) .. (end); will stop at (end)

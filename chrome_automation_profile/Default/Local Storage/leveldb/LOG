@@ -1,0 +1,45 @@
+2025/08/13-14:23:37.208 306c Reusing MANIFEST c:\Users\emir.usenmez\Contacts\heygen\chrome_automation_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/08/13-14:23:37.290 306c Recovering log #79
+2025/08/13-14:23:37.291 306c Level-0 table #83: started
+2025/08/13-14:23:37.323 306c Level-0 table #83: 87111 bytes OK
+2025/08/13-14:23:37.324 306c Recovering log #82
+2025/08/13-14:23:37.325 306c Level-0 table #84: started
+2025/08/13-14:23:37.336 306c Level-0 table #84: 95099 bytes OK
+2025/08/13-14:23:37.345 306c Delete type=0 #79
+2025/08/13-14:23:37.345 306c Delete type=0 #82
+2025/08/13-14:23:50.042 48d8 Level-0 table #87: started
+2025/08/13-14:23:50.072 48d8 Level-0 table #87: 223294 bytes OK
+2025/08/13-14:23:50.074 48d8 Delete type=0 #85
+2025/08/13-14:25:43.902 48d8 Level-0 table #89: started
+2025/08/13-14:25:43.909 48d8 Level-0 table #89: 88825 bytes OK
+2025/08/13-14:25:43.912 48d8 Delete type=0 #86
+2025/08/13-14:25:43.912 48d8 Compacting 4@0 + 1@1 files
+2025/08/13-14:25:43.925 48d8 Generated table #90@0: 65 keys, 306637 bytes
+2025/08/13-14:25:43.925 48d8 Compacted 4@0 + 1@1 files => 306637 bytes
+2025/08/13-14:25:43.927 48d8 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/08/13-14:25:43.928 48d8 Delete type=2 #81
+2025/08/13-14:25:43.928 48d8 Delete type=2 #83
+2025/08/13-14:25:43.929 48d8 Delete type=2 #84
+2025/08/13-14:25:43.929 48d8 Delete type=2 #87
+2025/08/13-14:25:43.929 48d8 Delete type=2 #89
+2025/08/13-14:27:08.330 48d8 Level-0 table #92: started
+2025/08/13-14:27:08.336 48d8 Level-0 table #92: 84756 bytes OK
+2025/08/13-14:27:08.339 48d8 Delete type=0 #88
+2025/08/13-14:28:48.638 48d8 Level-0 table #94: started
+2025/08/13-14:28:48.668 48d8 Level-0 table #94: 86540 bytes OK
+2025/08/13-14:28:48.672 48d8 Delete type=0 #91
+2025/08/13-14:37:27.731 48d8 Level-0 table #96: started
+2025/08/13-14:37:27.739 48d8 Level-0 table #96: 94569 bytes OK
+2025/08/13-14:37:27.742 48d8 Delete type=0 #93
+2025/08/13-14:38:23.511 48d8 Level-0 table #98: started
+2025/08/13-14:38:23.545 48d8 Level-0 table #98: 91510 bytes OK
+2025/08/13-14:38:23.575 48d8 Delete type=0 #95
+2025/08/13-14:38:23.578 48d8 Compacting 4@0 + 1@1 files
+2025/08/13-14:38:23.616 48d8 Generated table #99@0: 65 keys, 230738 bytes
+2025/08/13-14:38:23.616 48d8 Compacted 4@0 + 1@1 files => 230738 bytes
+2025/08/13-14:38:23.618 48d8 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/08/13-14:38:23.620 48d8 Delete type=2 #90
+2025/08/13-14:38:23.620 48d8 Delete type=2 #92
+2025/08/13-14:38:23.620 48d8 Delete type=2 #94
+2025/08/13-14:38:23.620 48d8 Delete type=2 #96
+2025/08/13-14:38:23.620 48d8 Delete type=2 #98

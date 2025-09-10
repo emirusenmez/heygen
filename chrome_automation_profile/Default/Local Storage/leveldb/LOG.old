@@ -1,0 +1,22 @@
+2025/08/13-14:21:25.526 1bcc Reusing MANIFEST c:\Users\emir.usenmez\Contacts\heygen\chrome_automation_profile\Default\Local Storage\leveldb/MANIFEST-000001
+2025/08/13-14:21:25.542 1bcc Recovering log #72
+2025/08/13-14:21:25.543 1bcc Level-0 table #75: started
+2025/08/13-14:21:25.624 1bcc Level-0 table #75: 86755 bytes OK
+2025/08/13-14:21:25.639 1bcc Delete type=0 #72
+2025/08/13-14:21:42.212 4af4 Level-0 table #78: started
+2025/08/13-14:21:42.224 4af4 Level-0 table #78: 221947 bytes OK
+2025/08/13-14:21:42.230 4af4 Delete type=0 #76
+2025/08/13-14:22:25.667 4af4 Level-0 table #80: started
+2025/08/13-14:22:25.685 4af4 Level-0 table #80: 83419 bytes OK
+2025/08/13-14:22:25.692 4af4 Delete type=0 #77
+2025/08/13-14:22:25.694 4af4 Compacting 4@0 + 1@1 files
+2025/08/13-14:22:25.722 4af4 Generated table #81@0: 63 keys, 306673 bytes
+2025/08/13-14:22:25.723 4af4 Compacted 4@0 + 1@1 files => 306673 bytes
+2025/08/13-14:22:25.725 4af4 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/08/13-14:22:25.727 4af4 Delete type=2 #71
+2025/08/13-14:22:25.727 4af4 Delete type=2 #73
+2025/08/13-14:22:25.727 4af4 Delete type=2 #75
+2025/08/13-14:22:25.728 4af4 Delete type=2 #78
+2025/08/13-14:22:25.728 4af4 Delete type=2 #80
+2025/08/13-14:23:30.073 1bcc Level-0 table #83: started
+2025/08/13-14:23:30.087 1bcc Level-0 table #83: 87111 bytes OK

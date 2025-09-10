@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demirören Medya Studio</title>
+    <style>
+        :root {
+            --bg-start: #0f172a;
+            --bg-end: #1e293b;
+            --card-bg: rgba(255, 255, 255, 0.08);
+            --card-border: rgba(255, 255, 255, 0.15);
+            --text: #e5e7eb;
+            --muted: #94a3b8;
+            --primary: #22d3ee;
+            --primary-2: #818cf8;
+            --ring: rgba(34, 211, 238, 0.5);
+        }
+        * { box-sizing: border-box; }
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+            color: var(--text);
+            background: radial-gradient(1200px 800px at 20% 10%, rgba(34,211,238,0.15), transparent 40%),
+                        radial-gradient(1000px 600px at 80% 20%, rgba(129,140,248,0.18), transparent 40%),
+                        linear-gradient(135deg, var(--bg-start), var(--bg-end));
+        }
+        .container {
+            min-height: 100%;
+            display: grid;
+            place-items: center;
+            padding: 32px 16px 80px 16px;
+        }
+        .card {
+            width: 100%;
+            max-width: 920px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            padding: 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);
+            position: relative;
+            overflow: hidden;
+        }
+        .card::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(1400px 240px at -10% -20%, rgba(34,211,238,0.12), transparent 60%),
+                        radial-gradient(1000px 220px at 110% -10%, rgba(129,140,248,0.12), transparent 60%);
+            pointer-events: none;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .brand {
+            font-weight: 700;
+            letter-spacing: 0.2px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header .meta {
+            text-align: center;
+        }
+        .brand .badge {
+            width: 12px; height: 12px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            box-shadow: 0 0 18px var(--ring);
+        }
+        .muted { color: var(--muted); font-size: 14px; }
+
+        .step {
+            transition: opacity 220ms ease, transform 220ms ease;
+        }
+        .hidden { display: none; }
+        .title {
+            font-size: clamp(24px, 3vw, 34px);
+            line-height: 1.2;
+            margin: 10px 0 6px;
+            font-weight: 700;
+        }
+        .subtitle { color: var(--muted); margin-bottom: 22px; font-size: 15px; }
+
+        .name-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+        }
+        .input {
+            width: 100%;
+            padding: 14px 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(148,163,184,0.25);
+            background: rgba(2,6,23,0.35);
+            color: var(--text);
+            outline: none;
+            transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+        }
+        .input::placeholder { color: #9aa5b1; }
+        .input:focus {
+            border-color: rgba(34,211,238,0.55);
+            box-shadow: 0 0 0 6px rgba(34,211,238,0.10);
+            background: rgba(2,6,23,0.5);
+        }
+        .btn {
+            padding: 12px 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(34,211,238,0.35);
+            color: #0b1220;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            cursor: pointer;
+            transition: transform 120ms ease, box-shadow 160ms ease, filter 120ms ease;
+        }
+        .btn:hover { filter: brightness(1.05); }
+        .btn:active { transform: translateY(1px); }
+
+        .langs {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+        .lang-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 12px;
+            border-radius: 14px;
+            background: rgba(2,6,23,0.35);
+            border: 1px solid rgba(148,163,184,0.2);
+            cursor: pointer;
+            transition: transform 140ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+            user-select: none;
+        }
+        .lang-card:hover {
+            transform: translateY(-1px);
+            background: rgba(2,6,23,0.45);
+            border-color: rgba(34,211,238,0.35);
+            box-shadow: 0 6px 18px rgba(2,6,23,0.45);
+        }
+        .lang-card.selected {
+            border-color: rgba(34,211,238,0.75);
+            background: rgba(2,6,23,0.55);
+            box-shadow: 0 0 0 6px rgba(34,211,238,0.10);
+        }
+        .flag { display: inline-block; width: 24px; height: 18px; border-radius: 4px; box-shadow: 0 0 0 1px rgba(148,163,184,0.35) inset; }
+        .lang-name { font-weight: 600; color: #e2e8f0; }
+        .question { margin: 4px 0 12px; color: var(--muted); }
+
+        .footer {
+            margin-top: 22px;
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+        .chip {
+            padding: 6px 10px; border-radius: 999px; border: 1px solid rgba(148,163,184,0.25);
+            background: rgba(2,6,23,0.35);
+        }
+        .actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+        .btn[disabled] { opacity: 0.6; cursor: not-allowed; }
+        
+        /* Kamera bölümü stilleri */
+        .camera-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-top: 18px;
+            padding: 20px;
+            border-radius: 16px;
+            background: rgba(2,6,23,0.4);
+            border: 1px solid rgba(34,211,238,0.2);
+        }
+        
+        .camera-container {
+            position: relative;
+            display: inline-block;
+        }
+        
+        .camera-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary);
+            text-align: center;
+        }
+        
+        .camera-preview {
+            width: 100%;
+            max-width: 800px;
+            height: 600px;
+            border-radius: 12px;
+            border: 2px solid rgba(34,211,238,0.3);
+            background: rgba(2,6,23,0.5);
+            object-fit: cover;
+        }
+        
+        .camera-status {
+            color: var(--muted);
+            font-size: 14px;
+            text-align: center;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(2,6,23,0.3);
+            border: 1px solid rgba(148,163,184,0.2);
+        }
+        
+        .pre-countdown-overlay {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(0,0,0,0.7));
+            border-radius: 20px;
+            border: 3px solid rgba(34,211,238,0.8);
+            z-index: 1001;
+        }
+        
+        .pre-countdown-number {
+            font-size: 72px;
+            font-weight: bold;
+            color: var(--primary);
+            text-shadow: 0 0 30px rgba(34,211,238,0.8);
+            margin: 0;
+        }
+        
+        .countdown-overlay {
+            display: none;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            text-align: center;
+            padding: 15px;
+            background: linear-gradient(135deg, rgba(0,0,0,0.8), rgba(0,0,0,0.6));
+            border-radius: 12px;
+            border: 2px solid rgba(34,211,238,0.5);
+            min-width: 120px;
+            z-index: 1000;
+        }
+        
+        .countdown-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: var(--primary);
+            text-shadow: 0 0 20px rgba(34,211,238,0.5);
+            margin-bottom: 8px;
+        }
+        
+        .countdown-text {
+            font-size: 16px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+        
+        @media (max-width: 768px) {
+            .camera-preview {
+                max-width: 600px;
+                height: 450px;
+            }
+            .pre-countdown-number {
+                font-size: 60px;
+            }
+            .countdown-overlay {
+                top: 15px;
+                right: 15px;
+                min-width: 100px;
+                padding: 12px;
+            }
+            .countdown-number {
+                font-size: 36px;
+            }
+        }
+        
+        @media (max-width: 520px) {
+            .name-row { grid-template-columns: 1fr; }
+            .camera-preview {
+                max-width: 400px;
+                height: 240px;
+            }
+            .pre-countdown-number {
+                font-size: 48px;
+            }
+            .countdown-overlay {
+                top: 10px;
+                right: 10px;
+                min-width: 80px;
+                padding: 10px;
+            }
+            .countdown-number {
+                font-size: 28px;
+            }
+        }
+
+        /* Tam ekran mesaj overlay */
+        .overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: radial-gradient(1200px 800px at 20% 10%, rgba(34,211,238,0.15), transparent 40%),
+                        radial-gradient(1000px 600px at 80% 20%, rgba(129,140,248,0.18), transparent 40%),
+                        linear-gradient(135deg, var(--bg-start), var(--bg-end));
+        }
+        .overlay .message {
+            text-align: center;
+            max-width: 900px;
+            line-height: 1.2;
+        }
+        .overlay .headline {
+            font-size: clamp(32px, 6vw, 64px);
+            font-weight: 800;
+            letter-spacing: 0.3px;
+        }
+        .overlay .sub {
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: clamp(16px, 2vw, 20px);
+        }
+        
+        /* Top logo - sadece step-1'de görünür */
+        .top-logo {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 20px;
+            padding: 20px 0;
+        }
+        .top-logo img {
+            max-height: 60px;
+            width: auto;
+        }
+        /* Step-2'de logo gizle */
+        #step-2 .top-logo {
+            display: none;
+        }
+        
+        /* Brand ticker */
+        .brandbar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 64px;
+            background: #ffffff;
+            z-index: 80;
+            border-top: 2px solid #e5e7eb;
+            overflow: hidden;
+            pointer-events: none;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+        }
+        .brandtrack {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            gap: 24px;
+            animation: scrollBrands 26s linear infinite;
+            will-change: transform;
+        }
+        .branditem {
+            flex: 0 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            padding: 0 12px;
+        }
+        .branditem img {
+            max-height: 36px;
+            width: auto;
+            filter: 
+                brightness(0.9) 
+                contrast(1.1) 
+                drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+            opacity: .8;
+            display: block;
+            transition: all 0.3s ease;
+        }
+        .branditem:hover img {
+            filter: 
+                brightness(1.0) 
+                contrast(1.2) 
+                drop-shadow(0 4px 8px rgba(0, 0, 0, 0.15));
+            opacity: 1;
+        }
+        @keyframes scrollBrands {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+    </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.getElementById('name-form');
+            const nameInput = document.getElementById('name');
+            const step1 = document.getElementById('step-1');
+            const step2 = document.getElementById('step-2');
+            const question = document.getElementById('question');
+            const startBtn = document.getElementById('start-record');
+            const statusEl = document.getElementById('status');
+            let selectedLanguage = null;
+            let pollTimer = null;
+            const overlayEl = document.getElementById('overlay');
+            const overlayText = document.getElementById('overlay-text');
+            const overlaySub = document.getElementById('overlay-sub');
+            
+            // Kamera önizlemesi elementleri
+            const cameraPreview = document.getElementById('camera-preview');
+            const cameraStatus = document.getElementById('camera-status');
+            const langsSection = document.getElementById('langs-section');
+            const cameraSection = document.getElementById('camera-section');
+            const countdownOverlay = document.getElementById('countdown-overlay');
+            const countdownNumber = document.getElementById('countdown-number');
+            const preCountdownOverlay = document.getElementById('pre-countdown-overlay');
+            const preCountdownNumber = document.getElementById('pre-countdown-number');
+            let cameraActive = false;
+            let countdownInterval = null;
+            
+
+            function resetToStart() {
+                // Ekranı başa döndür
+                step2.classList.add('hidden');
+                step1.classList.remove('hidden');
+                // Seçimleri temizle
+                document.querySelectorAll('.lang-card').forEach(c => c.classList.remove('selected'));
+                selectedLanguage = null;
+                startBtn.disabled = true;
+                startBtn.textContent = 'Videoya Başla';
+                statusEl.textContent = '';
+                overlayEl.style.display = 'none';
+                // Dil seçeneklerini göster, kamerayı gizle
+                langsSection.style.display = 'grid';
+                cameraSection.style.display = 'none';
+                // Kamerayı kapat
+                stopCameraPreview();
+                // Sayaçı durdur ve gizle
+                stopCountdown();
+            }
+            
+            function startCountdown() {
+                // Pre-countdown: 3, 2, 1
+                let preCount = 3;
+                preCountdownNumber.textContent = preCount;
+                preCountdownOverlay.style.display = 'block';
+                
+                const preCountdownInterval = setInterval(() => {
+                    preCount--;
+                    if (preCount > 0) {
+                        preCountdownNumber.textContent = preCount;
+                    } else {
+                        // "Kayıt Başladı" mesajı
+                        preCountdownNumber.textContent = 'Kayıt Başladı!';
+                        setTimeout(() => {
+                            preCountdownOverlay.style.display = 'none';
+                            startMainCountdown();
+                        }, 1000);
+                        clearInterval(preCountdownInterval);
+                    }
+                }, 1000);
+            }
+            
+            function startMainCountdown() {
+                // Ana countdown: 20'den geri sayım
+                let count = 20;
+                countdownNumber.textContent = count;
+                countdownOverlay.style.display = 'block';
+                
+                countdownInterval = setInterval(() => {
+                    count--;
+                    countdownNumber.textContent = count;
+                    
+                    if (count <= 0) {
+                        stopCountdown();
+                    }
+                }, 1000);
+            }
+            
+            function stopCountdown() {
+                if (countdownInterval) {
+                    clearInterval(countdownInterval);
+                    countdownInterval = null;
+                }
+                preCountdownOverlay.style.display = 'none';
+                countdownOverlay.style.display = 'none';
+                countdownNumber.textContent = '20';
+                preCountdownNumber.textContent = '3';
+            }
+
+            async function startCameraPreview() {
+                try {
+                    cameraStatus.textContent = 'Kamera başlatılıyor...';
+                    
+                    // Önce mevcut stream'i temizle
+                    cameraPreview.src = '';
+                    cameraPreview.style.display = 'none';
+                    
+                    const response = await fetch('/start-preview', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        // Cache'i temizlemek için timestamp ekle
+                        const timestamp = new Date().getTime();
+                        cameraPreview.src = `/camera-preview?t=${timestamp}`;
+                        cameraPreview.style.display = 'block';
+                        cameraStatus.textContent = 'Kamera aktif - Kendinizi görebilirsiniz';
+                        cameraActive = true;
+                    } else {
+                        cameraStatus.textContent = data.message || 'Kamera açılamadı';
+                    }
+                } catch (error) {
+                    cameraStatus.textContent = 'Kamera bağlantı hatası';
+                }
+            }
+
+            async function stopCameraPreview() {
+                try {
+                    if (cameraActive) {
+                        const response = await fetch('/stop-preview', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                        
+                        // Stream'i tamamen temizle
+                        cameraPreview.src = '';
+                        cameraPreview.style.display = 'none';
+                        cameraStatus.textContent = 'Dil seçtikten sonra kamera açılacak';
+                        cameraActive = false;
+                        
+                        // Kısa bekleme - stream tamamen temizlensin
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                } catch (error) {
+                    cameraStatus.textContent = 'Kamera durdurma hatası';
+                }
+            }
+
+            let recordingStarted = false;
+            
+            async function pollRecording(jobId) {
+                try {
+                    const res = await fetch(`/recording-status?job_id=${encodeURIComponent(jobId)}`);
+                    if (!res.ok) return; // bir sonraki poll denesin
+                    const data = await res.json();
+                    
+                    // Kayıt başladığında sayaçı başlat (sadece bir kez)
+                    if (data.status === 'recording' && !recordingStarted) {
+                        recordingStarted = true;
+                        // 3 saniye bekle (backend'deki geri sayım için)
+                        setTimeout(() => {
+                            startCountdown();
+                        }, 3000);
+                    }
+                    
+                    if (data.status === 'completed') {
+                        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                        // Sayaçı durdur
+                        stopCountdown();
+                        recordingStarted = false;
+                        // Tam ekran mesajı 15 saniye göster, sonra reset
+                        overlayText.textContent = 'Videonuz şu anda hazırlanıyor, görüntülemek için yandaki ekrana geçebilirsiniz.';
+                        overlaySub.textContent = '15 saniye içinde ana ekrana döneceksiniz';
+                        overlayEl.style.display = 'flex';
+                        setTimeout(() => {
+                            resetToStart();
+                        }, 15000);
+                    } else if (data.status === 'error') {
+                        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+                        // Sayaçı durdur
+                        stopCountdown();
+                        recordingStarted = false;
+                        statusEl.textContent = 'Kayıt sırasında hata oluştu.';
+                        startBtn.textContent = 'Videoya Başla';
+                        startBtn.disabled = false;
+                    }
+                } catch (e) {
+                    // ağ hatası: bir sonraki poll denesin
+                }
+            }
+
+            function proceed() {
+                const name = nameInput.value.trim();
+                if (!name) {
+                    nameInput.focus();
+                    nameInput.style.boxShadow = '0 0 0 6px rgba(244, 63, 94, 0.18)';
+                    setTimeout(() => nameInput.style.boxShadow = '', 220);
+                    return;
+                }
+                question.textContent = `Hangi dilde klonlama yapmak istiyorsunuz, ${name}?`;
+                step1.classList.add('hidden');
+                step2.classList.remove('hidden');
+            }
+
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                proceed();
+            });
+            document.getElementById('enter').addEventListener('click', proceed);
+
+            document.querySelectorAll('.lang-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    selectedLanguage = card.getAttribute('data-lang');
+                    document.querySelectorAll('.lang-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    startBtn.disabled = false;
+                    statusEl.textContent = `Seçilen dil: ${selectedLanguage}`;
+                });
+            });
+
+            startBtn.addEventListener('click', async () => {
+                const name = nameInput.value.trim();
+                if (!name || !selectedLanguage) return;
+                startBtn.disabled = true;
+                startBtn.textContent = 'Başlatılıyor...';
+                statusEl.textContent = 'Kamera açılıyor ve 20 saniyelik kayıt başlatılıyor...';
+                
+                try {
+                    // Dil seçeneklerini gizle, kamera bölümünü göster
+                    langsSection.style.display = 'none';
+                    cameraSection.style.display = 'flex';
+                    
+                    // Kamera önizlemesini başlat
+                    await startCameraPreview();
+                    
+                    const res = await fetch('/start-recording', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, language: selectedLanguage })
+                    });
+                    const data = await res.json();
+                    if (data && data.started) {
+                        statusEl.textContent = 'Kayıt başladı - Kendinizi görebilirsiniz';
+                        startBtn.textContent = 'Kayıt Devam Ediyor';
+                        if (data.job_id) {
+                            // Kayıt durumunu periyodik olarak sor
+                            if (pollTimer) { clearInterval(pollTimer); }
+                            pollTimer = setInterval(() => pollRecording(data.job_id), 1200);
+                        }
+                    } else {
+                        statusEl.textContent = 'Kayıt başlatılamadı.';
+                        startBtn.textContent = 'Videoya Başla';
+                        startBtn.disabled = false;
+                        // Hata durumunda dil seçeneklerini geri göster
+                        langsSection.style.display = 'grid';
+                        cameraSection.style.display = 'none';
+                    }
+                } catch (err) {
+                    statusEl.textContent = 'Bir hata oluştu. Lütfen tekrar deneyin.';
+                    startBtn.textContent = 'Videoya Başla';
+                    startBtn.disabled = false;
+                    // Hata durumunda dil seçeneklerini geri göster
+                    langsSection.style.display = 'grid';
+                    cameraSection.style.display = 'none';
+                }
+            });
+            
+            // Brand logos: duplicate track for seamless scroll
+            const brandTrack = document.getElementById('brandTrack');
+            const brands = [
+                '1DemiorenMedya.png',
+                'cnn.png','fanatik.png','hurriyet.png','kanald.png',
+                'milliyet.png','Posta.png','teve2.png','Vatan.png'
+            ];
+            function buildBrandItems(){
+                const make = () => brands.map(n=>{
+                    const w = document.createElement('div'); w.className='branditem';
+                    const img = document.createElement('img'); 
+                    img.src = '/brand/' + encodeURIComponent(n);
+                    img.alt = n.replace(/\.[^.]+$/,'');
+                    img.onerror = () => { img.style.display='none'; };
+                    w.appendChild(img); return w;
+                });
+                brandTrack.innerHTML = '';
+                // Sonsuz döngü için 3 kez tekrarla
+                for (let i = 0; i < 3; i++) {
+                    for (const node of make()) brandTrack.appendChild(node);
+                }
+            }
+            buildBrandItems();
+        });
+    </script>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%2322d3ee'/%3E%3Cstop offset='1' stop-color='%23818cf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='44' fill='url(%23g)'/%3E%3C/svg%3E" />
+    <meta name="theme-color" content="#0f172a" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/6.6.6/css/flag-icons.min.css" />
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="header">
+            </div>
+
+            <div id="step-1" class="step">
+                <div class="top-logo">
+                    <img src="/logo.png" alt="Demirören Medya" onerror="this.style.opacity=0;" />
+                </div>
+                <div class="title">Hoş geldiniz</div>
+                <div class="subtitle">Lütfen adınızı ve soyadınızı giriniz ve girişe basınız.</div>
+                <form id="name-form" class="name-row">
+                    <input id="name" class="input" type="text" placeholder="Adınız ve Soyadınız" autocomplete="name" />
+                    <button id="enter" class="btn" type="submit">Giriş</button>
+                </form>
+            </div>
+
+            <div id="step-2" class="step hidden">
+                <div class="title">Dil Seçimi</div>
+                <div id="question" class="question">Hangi dilde klonlama yapmak istiyorsunuz?</div>
+
+                <div class="langs" id="langs-section">
+                    <div class="lang-card" data-lang="English"><span class="flag fi fi-us"></span> <span class="lang-name">İngilizce</span></div>
+                    <div class="lang-card" data-lang="Spanish"><span class="flag fi fi-es"></span> <span class="lang-name">İspanyolca</span></div>
+                    <div class="lang-card" data-lang="French"><span class="flag fi fi-fr"></span> <span class="lang-name">Fransızca</span></div>
+                    <div class="lang-card" data-lang="Hindi"><span class="flag fi fi-in"></span> <span class="lang-name">Hintçe</span></div>
+                    <div class="lang-card" data-lang="Italian"><span class="flag fi fi-it"></span> <span class="lang-name">İtalyanca</span></div>
+                    <div class="lang-card" data-lang="German"><span class="flag fi fi-de"></span> <span class="lang-name">Almanca</span></div>
+                    <div class="lang-card" data-lang="Polish"><span class="flag fi fi-pl"></span> <span class="lang-name">Lehçe</span></div>
+                    <div class="lang-card" data-lang="Portuguese"><span class="flag fi fi-pt"></span> <span class="lang-name">Portekizce</span></div>
+                    <div class="lang-card" data-lang="Chinese"><span class="flag fi fi-cn"></span> <span class="lang-name">Çince</span></div>
+                    <div class="lang-card" data-lang="Japanese"><span class="flag fi fi-jp"></span> <span class="lang-name">Japonca</span></div>
+                    <div class="lang-card" data-lang="Dutch"><span class="flag fi fi-nl"></span> <span class="lang-name">Felemenkçe</span></div>
+                    <div class="lang-card" data-lang="Turkish"><span class="flag fi fi-tr"></span> <span class="lang-name">Türkçe</span></div>
+                    <div class="lang-card" data-lang="Korean"><span class="flag fi fi-kr"></span> <span class="lang-name">Korece</span></div>
+                    <div class="lang-card" data-lang="Danish"><span class="flag fi fi-dk"></span> <span class="lang-name">Danca</span></div>
+                    <div class="lang-card" data-lang="Arabic"><span class="flag fi fi-sa"></span> <span class="lang-name">Arapça</span></div>
+                    <div class="lang-card" data-lang="Romanian"><span class="flag fi fi-ro"></span> <span class="lang-name">Rumence</span></div>
+                    <div class="lang-card" data-lang="Mandarin"><span class="flag fi fi-cn"></span> <span class="lang-name">Mandarince</span></div>
+                    <div class="lang-card" data-lang="Filipino"><span class="flag fi fi-ph"></span> <span class="lang-name">Filipince</span></div>
+                    <div class="lang-card" data-lang="Swedish"><span class="flag fi fi-se"></span> <span class="lang-name">İsveççe</span></div>
+                    <div class="lang-card" data-lang="Indonesian"><span class="flag fi fi-id"></span> <span class="lang-name">Endonezce</span></div>
+                    <div class="lang-card" data-lang="Ukrainian"><span class="flag fi fi-ua"></span> <span class="lang-name">Ukraynaca</span></div>
+                    <div class="lang-card" data-lang="Greek"><span class="flag fi fi-gr"></span> <span class="lang-name">Yunanca</span></div>
+                    <div class="lang-card" data-lang="Czech"><span class="flag fi fi-cz"></span> <span class="lang-name">Çekçe</span></div>
+                    <div class="lang-card" data-lang="Bulgarian"><span class="flag fi fi-bg"></span> <span class="lang-name">Bulgarca</span></div>
+                    <div class="lang-card" data-lang="Malay"><span class="flag fi fi-my"></span> <span class="lang-name">Malayca</span></div>
+                    <div class="lang-card" data-lang="Slovak"><span class="flag fi fi-sk"></span> <span class="lang-name">Slovakça</span></div>
+                    <div class="lang-card" data-lang="Croatian"><span class="flag fi fi-hr"></span> <span class="lang-name">Hırvatça</span></div>
+                    <div class="lang-card" data-lang="Tamil"><span class="flag fi fi-lk"></span> <span class="lang-name">Tamilce</span></div>
+                    <div class="lang-card" data-lang="Finnish"><span class="flag fi fi-fi"></span> <span class="lang-name">Fince</span></div>
+                    <div class="lang-card" data-lang="Russian"><span class="flag fi fi-ru"></span> <span class="lang-name">Rusça</span></div>
+                </div>
+
+                <div class="camera-section" id="camera-section" style="display: none;">
+                    <div class="camera-title">Kamera Görüntüsü</div>
+                    <div class="camera-container">
+                        <img id="camera-preview" class="camera-preview" alt="Kamera Görüntüsü" />
+                        <div class="pre-countdown-overlay" id="pre-countdown-overlay">
+                            <div class="pre-countdown-number" id="pre-countdown-number">3</div>
+                        </div>
+                        <div class="countdown-overlay" id="countdown-overlay">
+                            <div class="countdown-number" id="countdown-number">20</div>
+                            <div class="countdown-text">Kayıt Süresi</div>
+                        </div>
+                    </div>
+                    <div class="camera-status" id="camera-status">Kayıt sırasında kendinizi görebilirsiniz</div>
+                </div>
+
+
+                <div class="actions">
+                    <button id="start-record" class="btn" type="button" disabled>Videoya Başla</button>
+                    <span id="status" class="muted"></span>
+                </div>
+
+                <div class="footer">
+                    <span class="chip">Toplam 30 dil</span>
+                    <span class="muted">Seçiminiz anında işlenecektir.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="overlay" class="overlay">
+        <div class="message">
+            <div id="overlay-text" class="headline">Videonuz şu anda hazırlanıyor, görüntülemek için yandaki ekrana geçebilirsiniz.</div>
+            <div id="overlay-sub" class="sub">15 saniye içinde ana ekrana döneceksiniz</div>
+        </div>
+    </div>
+    
+    <!-- Brand ticker -->
+    <div class="brandbar" aria-hidden="true">
+        <div class="brandtrack" id="brandTrack"></div>
+    </div>
+    
+    <!-- Not: Dilerseniz seçim sonrası akışı Flask tarafında ek rota ile genişletebilirsiniz. -->
+    <!-- Örn: /select-language POST ve /workflow?lang=... GET -->
+    <!-- Bu şablon tek dosyada modern görünüm ve akışı sağlar. -->
+    
+    
+</body>
+</html>
+
+
