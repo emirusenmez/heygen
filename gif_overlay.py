@@ -76,10 +76,16 @@ def overlay_gif_on_frame(frame: np.ndarray, gif_frames: list, gif_frame_index: i
     frame_h, frame_w = frame.shape[:2]
     gif_h, gif_w = gif_frame.shape[:2]
     
-    # Pozisyonu hesapla (sağ üst köşe için)
-    if position == (0, 0):  # Varsayılan: sağ üst köşe
+    # Pozisyonu hesapla
+    if position == (0, 0):  # Sağ üst köşe
         x = frame_w - gif_w - 10  # 10px margin
         y = 10  # 10px margin
+    elif position == (1, 1):  # Sol üst köşe
+        x = 10  # 10px margin
+        y = 10  # 10px margin
+    elif position == (2, 2):  # Merkez
+        x = (frame_w - gif_w) // 2  # Merkez
+        y = (frame_h - gif_h) // 2  # Merkez
     else:
         x, y = position
     

@@ -34,6 +34,12 @@ GIF_POSITION = (0, 0)  # (0,0) = sağ üst köşe
 GIF_ALPHA = 1.0  # Şeffaflık (1.0 = tam opak)
 GIF_DURATION = 20.0  # GIF'in bir turu kaç saniyede tamamlanacak
 
+# Fligram overlay ayarları
+FLIGRAM_PATH = '/Users/emirefeusenmez/code/heygen/fligram.png'
+FLIGRAM_SIZE = (1280, 720)  # Tam ekran boyut (video boyutu)
+FLIGRAM_POSITION = (2, 2)  # (2,2) = merkez
+FLIGRAM_ALPHA = 0.3  # Şeffaflık (0.3 = %30 opak - watermark için)
+
 
 app = Flask(__name__)
 
@@ -175,6 +181,10 @@ def overlay_text(frame, text: str):
 GIF_FRAMES = None
 GIF_LOADED = False
 
+# Fligram overlay için global değişkenler
+FLIGRAM_IMAGE = None
+FLIGRAM_LOADED = False
+
 def load_gif_overlay():
     """GIF overlay'i yükle"""
     global GIF_FRAMES, GIF_LOADED
@@ -198,6 +208,50 @@ def load_gif_overlay():
     except Exception as e:
         print(f"❌ GIF overlay yükleme hatası: {e}")
         return None
+
+def load_fligram_overlay():
+    """Fligram overlay'i yükle"""
+    global FLIGRAM_IMAGE, FLIGRAM_LOADED
+    
+    if FLIGRAM_LOADED:
+        return FLIGRAM_IMAGE
+    
+    try:
+        if os.path.exists(FLIGRAM_PATH):
+            # PNG dosyasını yükle
+            from PIL import Image
+            pil_image = Image.open(FLIGRAM_PATH)
+            
+            # Alpha channel'ı koru
+            if pil_image.mode != 'RGBA':
+                pil_image = pil_image.convert('RGBA')
+            
+            # Hedef boyuta resize et
+            pil_image = pil_image.resize(FLIGRAM_SIZE, Image.Resampling.LANCZOS)
+            
+            # PIL'den OpenCV formatına çevir (RGBA -> BGRA)
+            FLIGRAM_IMAGE = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGBA2BGRA)
+            FLIGRAM_LOADED = True
+            print(f"✅ Fligram overlay yüklendi: {FLIGRAM_SIZE}")
+            return FLIGRAM_IMAGE
+        else:
+            print(f"⚠️ Fligram dosyası bulunamadı: {FLIGRAM_PATH}")
+            return None
+    except Exception as e:
+        print(f"❌ Fligram overlay yükleme hatası: {e}")
+        return None
+
+def add_fligram_to_frame(frame):
+    """Frame'e Fligram overlay ekle"""
+    global FLIGRAM_IMAGE
+    
+    if FLIGRAM_IMAGE is None:
+        FLIGRAM_IMAGE = load_fligram_overlay()
+    
+    if FLIGRAM_IMAGE is not None:
+        return overlay_gif_on_frame(frame, [FLIGRAM_IMAGE], 0, FLIGRAM_POSITION, FLIGRAM_ALPHA)
+    else:
+        return frame
 
 def add_gif_to_frame(frame, frame_index: int, fps: float = 30.0):
     """Frame'e GIF overlay ekle - hız kontrolü ile"""
@@ -916,6 +970,9 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             # GIF overlay ekle
             frame = add_gif_to_frame(frame, frame_count, 30.0)
             
+            # Fligram overlay ekle
+            frame = add_fligram_to_frame(frame)
+            
             # Frame'i videoya yaz
             out.write(frame)
             
@@ -1192,6 +1249,9 @@ def record_with_opencv_and_audio(output_path: str, device_index: int = 0, durati
             # GIF overlay ekle
             frame = add_gif_to_frame(frame, frame_count, 30.0)
             
+            # Fligram overlay ekle
+            frame = add_fligram_to_frame(frame)
+            
             # Frame'i videoya yaz
             out.write(frame)
             
@@ -1377,6 +1437,9 @@ def record_20_seconds(output_path: str, device_index: int = 0, duration_sec: int
                 
                 # GIF overlay ekle
                 frame = add_gif_to_frame(frame, i, fps)
+                
+                # Fligram overlay ekle
+                frame = add_fligram_to_frame(frame)
                 
                 # Frame yazma
                 try:
