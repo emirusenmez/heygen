@@ -1724,6 +1724,99 @@ def _maybe_build_public_url(local_path: str) -> str | None:
 def index():
     return render_template("index.html")
 
+# Dil verileri ve ağırlıkları
+languageData = [
+    # Ana Diller (Daha Sık)
+    {'lang': 'English', 'flag': 'fi-us', 'name': 'İngilizce', 'weight': 16.0},
+    {'lang': 'Spanish', 'flag': 'fi-es', 'name': 'İspanyolca', 'weight': 10.0},
+    {'lang': 'Chinese', 'flag': 'fi-cn', 'name': 'Çince', 'weight': 8.0},
+    {'lang': 'Hindi', 'flag': 'fi-in', 'name': 'Hindi', 'weight': 6.0},
+    {'lang': 'Arabic', 'flag': 'fi-sa', 'name': 'Arapça', 'weight': 6.0},
+    {'lang': 'Portuguese', 'flag': 'fi-pt', 'name': 'Portekizce', 'weight': 6.0},
+    {'lang': 'Russian', 'flag': 'fi-ru', 'name': 'Rusça', 'weight': 6.0},
+    {'lang': 'Japanese', 'flag': 'fi-jp', 'name': 'Japonca', 'weight': 6.0},
+    {'lang': 'Turkish', 'flag': 'fi-tr', 'name': 'Türkçe', 'weight': 6.0},
+    
+    # Özel Diller (Daha Sık)
+    {'lang': 'French', 'flag': 'fi-fr', 'name': 'Fransızca', 'weight': 10.0},
+    {'lang': 'German', 'flag': 'fi-de', 'name': 'Almanca', 'weight': 10.0},
+    {'lang': 'Italian', 'flag': 'fi-it', 'name': 'İtalyanca', 'weight': 10.0},
+    {'lang': 'Dutch', 'flag': 'fi-nl', 'name': 'Felemenkçe', 'weight': 10.0},
+    {'lang': 'Korean', 'flag': 'fi-kr', 'name': 'Korece', 'weight': 8.0},
+    
+    # Kalan Diller (Nadiren)
+    {'lang': 'Romanian', 'flag': 'fi-ro', 'name': 'Rumence', 'weight': 2.0},
+    {'lang': 'Filipino', 'flag': 'fi-ph', 'name': 'Filipince', 'weight': 2.0},
+    {'lang': 'Swedish', 'flag': 'fi-se', 'name': 'İsveççe', 'weight': 2.0},
+    {'lang': 'Indonesian', 'flag': 'fi-id', 'name': 'Endonezce', 'weight': 2.0},
+    {'lang': 'Ukrainian', 'flag': 'fi-ua', 'name': 'Ukraynaca', 'weight': 2.0},
+    {'lang': 'Greek', 'flag': 'fi-gr', 'name': 'Yunanca', 'weight': 2.0},
+    {'lang': 'Czech', 'flag': 'fi-cz', 'name': 'Çekçe', 'weight': 2.0},
+    {'lang': 'Bulgarian', 'flag': 'fi-bg', 'name': 'Bulgarca', 'weight': 2.0},
+    {'lang': 'Slovak', 'flag': 'fi-sk', 'name': 'Slovakça', 'weight': 2.0},
+    {'lang': 'Croatian', 'flag': 'fi-hr', 'name': 'Hırvatça', 'weight': 2.0},
+    {'lang': 'Finnish', 'flag': 'fi-fi', 'name': 'Fince', 'weight': 2.0}
+]
+
+def weightedPick():
+    """Ağırlıklı rastgele seçim yapar"""
+    total_weight = sum(lang['weight'] for lang in languageData)
+    random_num = random.uniform(0, total_weight)
+    
+    current_weight = 0
+    for lang in languageData:
+        current_weight += lang['weight']
+        if random_num <= current_weight:
+            return lang
+    
+    # Fallback - son dil
+    return languageData[-1]
+
+@app.route('/api/languages')
+def get_languages():
+    """Tüm dil verilerini döndürür"""
+    return jsonify(languageData)
+
+@app.route('/api/spin')
+def spin():
+    """Slot makinesi için animasyon adımlarını döndürür"""
+    steps = []
+    final_language = weightedPick()
+    
+    # Tüm dilleri karıştır ve her birini kesin olarak bir kez göster
+    all_languages = languageData.copy()
+    random.shuffle(all_languages)
+    
+    # İlk 25 adım: Tüm dilleri kesin olarak bir kez göster
+    for i in range(len(all_languages)):
+        lang = all_languages[i]
+        steps.append({
+            'language': lang,
+            'delay': 70  # Çok hızlı geçiş
+        })
+    
+    # Kalan süre: Rastgele diller (çok hızlı)
+    # 10 saniye = 10000ms, 25 dil * 100ms = 2500ms
+    # Kalan 7500ms / 100ms = 75 adım daha
+    for i in range(20):
+        # Rastgele dil seçimi
+        lang = random.choice(languageData)
+        steps.append({
+            'language': lang,
+            'delay': 200  # Çok hızlı geçiş
+        })
+    
+    # Son adım kesinlikle hedef
+    steps.append({
+        'language': final_language,
+        'delay': 100
+    })
+    
+    return jsonify({
+        'steps': steps,
+        'final': final_language
+    })
+
 
 @app.route("/check-camera", methods=["GET"])
 def check_camera():
