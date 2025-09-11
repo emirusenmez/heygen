@@ -31,14 +31,16 @@ RAW_OUTPUT_DIR = r'/Users/emirefeusenmez/code/heygen/outputs'
 GIF_PATH = '/Users/emirefeusenmez/code/heygen/gif.gif'
 GIF_SIZE = (200, 200)  # 200x200 piksel
 GIF_POSITION = (0, 0)  # (0,0) = sağ üst köşe
-GIF_ALPHA = 1.0  # Şeffaflık (1.0 = tam opak, arka plan tamamen şeffaf)
+GIF_ALPHA = 1.0  # Şeffaflık (1.0 = tam opak)
 GIF_DURATION = 20.0  # GIF'in bir turu kaç saniyede tamamlanacak
+GIF_ENABLED = True  # GIF overlay'i test amaçlı devre dışı bırakmak için bayrak
 
-# Fligram overlay ayarları
+# Fligram overlay ayarları (DEVRE DIŞI)
 FLIGRAM_PATH = '/Users/emirefeusenmez/code/heygen/fligram.png'
 FLIGRAM_SIZE = None  # Video boyutuna göre dinamik olarak hesaplanacak
 FLIGRAM_POSITION = (2, 2)  # (2,2) = merkez
 FLIGRAM_ALPHA = 0.3  # Şeffaflık (0.3 = %30 opak - watermark için)
+FLIGRAM_ENABLED = False  # Fligram overlay'i devre dışı
 
 
 app = Flask(__name__)
@@ -252,6 +254,10 @@ def add_fligram_to_frame(frame):
     """Frame'e Fligram overlay ekle - 1:1 oranında ve tam merkezde"""
     global FLIGRAM_IMAGE
     
+    # Fligram devre dışıysa frame'i olduğu gibi döndür
+    if not FLIGRAM_ENABLED:
+        return frame
+    
     # Frame boyutlarını al
     frame_height, frame_width = frame.shape[:2]
     
@@ -267,6 +273,10 @@ def add_gif_to_frame(frame, frame_index: int, fps: float = 30.0):
     """Frame'e GIF overlay ekle - hız kontrolü ile"""
     global GIF_FRAMES
     
+    # GIF overlay'i devre dışı bırakma seçeneği
+    if not GIF_ENABLED:
+        return frame
+
     if GIF_FRAMES is None:
         GIF_FRAMES = load_gif_overlay()
     
@@ -724,12 +734,21 @@ def generate_frames():
             break
 
 
-def mux_with_ffmpeg(video_path: str, audio_path: str, output_path: str) -> bool:
+def mux_with_ffmpeg(video_path: str, audio_path: str, output_path: str, audio_tempo: float | None = None) -> bool:
     ffmpeg = get_ffmpeg_path()
     if not ffmpeg:
         return False
     
     # Cızırtı önleyici ayarlar: büyük thread queue, pan + yumuşak resample
+    # Dinamik ses zamanlama düzeltmesi (atempo) için filtre zinciri oluştur
+    afilters = [
+        'highpass=80',
+        'lowpass=15000',
+        'aresample=async=1000:min_hard_comp=0.100:first_pts=0'
+    ]
+    if audio_tempo and 0.5 <= audio_tempo <= 2.0 and abs(audio_tempo - 1.0) > 0.01:
+        afilters.append(f'atempo={audio_tempo:.4f}')
+
     cmd = [
         ffmpeg, '-y',
         '-thread_queue_size', '4096', '-i', video_path,
@@ -738,8 +757,9 @@ def mux_with_ffmpeg(video_path: str, audio_path: str, output_path: str) -> bool:
         '-c:v', 'copy',
         '-c:a', 'aac', '-b:a', '192k',
         '-ar', '48000', '-ac', '1',
-        '-af', 'aresample=async=1000:min_hard_comp=0.100:first_pts=0,highpass=80,lowpass=15000',
-        '-shortest', '-movflags', '+faststart',
+        '-af', ','.join(afilters),
+        '-shortest',  # Kısa olanı al (senkronizasyon için)
+        '-movflags', '+faststart',
         output_path
     ]
     
@@ -877,7 +897,7 @@ def video_ses_birlestir(video_dosya, ses_dosya, cikti_dosya):
             '-b:a', '192k',
             '-ar', '48000', '-ac', '1',
             '-af', 'aresample=async=1000:min_hard_comp=0.100:first_pts=0,highpass=80,lowpass=15000',
-            '-shortest',
+            '-shortest',  # Kısa olanı al (senkronizasyon için)
             '-movflags', '+faststart',
             cikti_dosya
         ]
@@ -947,9 +967,9 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             time.sleep(1)
         print("🎬 Kayıt başladı!")
         
-        # 4. 1 saniye daha bekle (kayıt süresine dahil değil)
-        print("1 saniye daha bekleniyor...")
-        time.sleep(1)
+        # 4. 2 saniye daha bekle (kayıt süresine dahil değil)
+        print("2 saniye daha bekleniyor...")
+        time.sleep(2)
         print("🎬 Gerçek kayıt başladı!")
         
         # 5. Ses kaydını başlat (ayrı thread'de)
@@ -961,13 +981,18 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             audio_thread = threading.Thread(target=ses_kaydet, args=(duration_sec, audio_file, device_index), daemon=True)
             audio_thread.start()
         
-        # 6. Video kayıt döngüsü (geri sayım + 1 saniye sonrası başlar)
+        # 6. Video kayıt döngüsü (geri sayım + 2 saniye sonrası başlar)
         print("🎬 Video kaydı başlıyor...")
         start_time = time.time()
         frame_count = 0
-        target_frames = int(duration_sec * 30)  # 20 saniye * 30 FPS = 600 frame
+        target_frames = duration_sec * 30  # 20 saniye = 600 frame (30 FPS)
         
         while frame_count < target_frames:
+            # Frame sayısına göre kontrol (tam 20 saniye için)
+            if frame_count >= target_frames:
+                print(f"✅ Hedef frame sayısına ulaşıldı: {frame_count}/{target_frames}")
+                break
+                
             # Frame oku
             ret, frame = cap.read()
             
@@ -989,14 +1014,11 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             
             frame_count += 1
             elapsed = time.time() - start_time
+            remaining = duration_sec - elapsed
             
             # İlerleme göster (her saniye)
             if frame_count % 30 == 0:
-                print(f"📹 Kayıt: {frame_count}/{target_frames} frame ({elapsed:.1f}s)")
-            
-            # Frame sayısına göre kontrol (daha kesin)
-            if frame_count >= target_frames:
-                break
+                print(f"📹 Kayıt: {elapsed:.1f}s / {duration_sec}s (Kalan: {remaining:.1f}s)")
         
         # 5. Video kaydını bitir
         try:
@@ -1010,13 +1032,20 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
         # 6. Ses kaydının bitmesini bekle
         if with_audio and audio_thread:
             print("🎤 Ses kaydı bekleniyor...")
-            audio_thread.join(timeout=5)
+            audio_thread.join(timeout=10)
         
         # 7. Video ve sesi birleştir
         if with_audio and os.path.exists(audio_file):
             print("🔗 Video ve ses birleştiriliyor...")
+            # Gerçek kayıt süresini ölç ve ses temposunu videoya uydur
+            actual_duration = max(0.1, time.time() - start_time)
+            tempo_factor = actual_duration / float(duration_sec)
+            if 0.5 <= tempo_factor <= 2.0 and abs(tempo_factor - 1.0) > 0.01:
+                print(f"⏱️  Gerçek süre: {actual_duration:.2f}s, Hedef: {duration_sec}s, atempo={tempo_factor:.4f}")
+            else:
+                print(f"⏱️  Gerçek süre: {actual_duration:.2f}s, Hedef: {duration_sec}s, atempo uygulanmayacak")
             
-            if mux_with_ffmpeg(video_file, audio_file, output_path):
+            if mux_with_ffmpeg(video_file, audio_file, output_path, tempo_factor):
                 # Geçici dosyaları sil
                 try:
                     os.remove(video_file)
@@ -1577,10 +1606,18 @@ def _download_file(url: str, out_path: str) -> None:
                 f.write(chunk)
 
 
-def _create_translation(video_url: str, title: str, output_language: str, api_key: str) -> str:
+def _create_translation(video_url: str, title: str, output_language: str, api_key: str, with_captions: bool = True) -> str:
     url = 'https://api.heygen.com/v2/video_translate'
     headers = {'accept': 'application/json', 'content-type': 'application/json', 'x-api-key': api_key}
-    payload = {'video_url': video_url, 'title': title, 'output_language': output_language}
+    
+    # Altyazı ile çeviri payload'ı
+    payload = {
+        'video_url': video_url, 
+        'title': title, 
+        'output_language': output_language,
+        'captions': with_captions  # Altyazı ekleme
+    }
+    
     resp = requests.post(url, headers=headers, data=json.dumps(payload))
     if resp.status_code not in (200, 201, 202):
         raise RuntimeError(f'create_translation hata: {resp.status_code} {resp.text[:200]}')
@@ -1605,6 +1642,27 @@ def _get_status(video_translate_id: str, api_key: str) -> dict:
             except Exception:
                 pass
     return {'status': 'unknown'}
+
+
+def _get_caption_url(video_translate_id: str, api_key: str) -> str | None:
+    """Altyazı dosyasının URL'sini al (VTT formatında)"""
+    headers = {'accept': 'application/json', 'x-api-key': api_key}
+    url = f'https://api.heygen.com/v2/video_translate/caption?video_translate_id={video_translate_id}&caption_type=vtt'
+    
+    try:
+        resp = requests.get(url, headers=headers)
+        if resp.status_code == 200:
+            data = resp.json()
+            caption_url = data.get('caption_url') or data.get('url')
+            if caption_url:
+                print(f'📝 Altyazı URL bulundu: {caption_url}')
+                return caption_url
+        else:
+            print(f'⚠️ Altyazı URL alınamadı: {resp.status_code} {resp.text[:200]}')
+    except Exception as e:
+        print(f'⚠️ Altyazı URL alma hatası: {e}')
+    
+    return None
 
 
 def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, translation_id: str = None) -> None:
@@ -1653,8 +1711,9 @@ def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, trans
     if translation_id:
         TRANSLATION_JOBS[translation_id] = {"status": "translating", "message": "Çeviri başlatılıyor..."}
     
-    vt_id = _create_translation(public_url, title, output_language, api_key)
+    vt_id = _create_translation(public_url, title, output_language, api_key, with_captions=True)
     print(f'video_translate_id: {vt_id}')
+    print(f'📝 Altyazı ile çeviri başlatıldı (Dil: {output_language})')
 
     start_t = time.time()
     deadline = 60 * 30
@@ -1702,8 +1761,21 @@ def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, trans
     _download_file(download_url, out_path)
     print(f'Çeviri tamamlandı: {out_path}')
     
+    # Altyazı dosyasını da indir (VTT formatında)
+    try:
+        caption_url = _get_caption_url(vt_id, api_key)
+        if caption_url:
+            caption_path = os.path.join(TRANSLATED_OUTPUT_DIR, f'{safe_name}_{safe_lang}.vtt')
+            print('📝 Altyazı dosyası indiriliyor...')
+            _download_file(caption_url, caption_path)
+            print(f'📝 Altyazı dosyası indirildi: {caption_path}')
+        else:
+            print('⚠️ Altyazı dosyası bulunamadı')
+    except Exception as e:
+        print(f'⚠️ Altyazı indirme hatası: {e}')
+    
     if translation_id:
-        TRANSLATION_JOBS[translation_id] = {"status": "completed", "message": "Çeviri tamamlandı", "output_path": out_path}
+        TRANSLATION_JOBS[translation_id] = {"status": "completed", "message": "Çeviri ve altyazı tamamlandı", "output_path": out_path}
 
 
 @app.route('/outputs/<path:filename>')
@@ -1976,6 +2048,36 @@ def translation_status():
     if not translation_id or translation_id not in TRANSLATION_JOBS:
         return jsonify({"error": "not_found"}), 404
     return jsonify({"translation_id": translation_id, **TRANSLATION_JOBS[translation_id]})
+
+
+@app.route("/caption-status", methods=["GET"])
+def caption_status():
+    """Altyazı durumunu kontrol et"""
+    translation_id = request.args.get("translation_id", "").strip()
+    if not translation_id or translation_id not in TRANSLATION_JOBS:
+        return jsonify({"error": "not_found"}), 404
+    
+    job_data = TRANSLATION_JOBS[translation_id]
+    
+    # Çeviri tamamlandıysa altyazı dosyasını kontrol et
+    if job_data.get("status") == "completed":
+        output_path = job_data.get("output_path", "")
+        if output_path:
+            # VTT dosyasının varlığını kontrol et
+            vtt_path = output_path.replace('.mp4', '.vtt')
+            if os.path.exists(vtt_path):
+                return jsonify({
+                    "translation_id": translation_id,
+                    "caption_available": True,
+                    "caption_path": vtt_path,
+                    "message": "Altyazı dosyası hazır"
+                })
+    
+    return jsonify({
+        "translation_id": translation_id,
+        "caption_available": False,
+        "message": "Altyazı henüz hazır değil"
+    })
 
 def cleanup_resources():
     """Uygulama kapatılırken kaynakları temizle"""
