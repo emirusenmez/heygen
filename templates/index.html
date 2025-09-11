@@ -400,6 +400,157 @@
             0% { transform: translateX(0); }
             100% { transform: translateX(-100%); }
         }
+        
+        /* Bayrak animasyonu stilleri */
+        .flag-animation-container {
+            position: relative;
+            width: 100%;
+            height: 120px;
+            margin: 20px 0;
+            overflow: hidden;
+            border-radius: 16px;
+            background: rgba(2,6,23,0.4);
+            border: 2px solid rgba(34,211,238,0.3);
+        }
+        
+        .flag-track {
+            display: flex;
+            align-items: center;
+            height: 100%;
+            gap: 20px;
+            will-change: transform;
+        }
+        
+        .flag-item {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+            border-radius: 12px;
+            background: rgba(2,6,23,0.6);
+            border: 2px solid rgba(148,163,184,0.3);
+            transition: all 0.3s ease;
+            min-width: 80px;
+            height: 80px;
+        }
+        
+        .flag-item:hover {
+            transform: scale(1.05);
+            border-color: rgba(34,211,238,0.6);
+            background: rgba(2,6,23,0.8);
+        }
+        
+        .flag-item .flag {
+            width: 40px;
+            height: 30px;
+            border-radius: 6px;
+            margin-bottom: 5px;
+        }
+        
+        .flag-item .lang-name {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text);
+            text-align: center;
+        }
+        
+        .flag-selector {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 4px;
+            height: 100px;
+            background: linear-gradient(180deg, var(--primary), var(--primary-2));
+            border-radius: 2px;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(34,211,238,0.8);
+        }
+        
+        .selector-arrow {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(34,211,238,0.8);
+            animation: bounce 1s ease-in-out infinite;
+        }
+        
+        @keyframes scrollFlagsVeryFast {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-200%); }
+        }
+        
+        @keyframes scrollFlagsFast {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-150%); }
+        }
+        
+        @keyframes scrollFlagsMedium {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+        
+        @keyframes scrollFlagsSlow {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        
+        .flag-track.very-fast {
+            animation: scrollFlagsVeryFast 3s linear;
+        }
+        
+        .flag-track.fast {
+            animation: scrollFlagsFast 4s linear;
+        }
+        
+        .flag-track.medium {
+            animation: scrollFlagsMedium 5s ease-in-out;
+        }
+        
+        .flag-track.slow {
+            animation: scrollFlagsSlow 4s ease-out;
+        }
+        
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+            40% { transform: translateX(-50%) translateY(-5px); }
+            60% { transform: translateX(-50%) translateY(-3px); }
+        }
+        
+        .flag-track.stopped {
+            animation-play-state: paused;
+        }
+        
+        .selected-language-display {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(34,211,238,0.2), rgba(129,140,248,0.2));
+            border: 2px solid rgba(34,211,238,0.5);
+        }
+        
+        .selected-flag {
+            width: 60px;
+            height: 45px;
+            border-radius: 8px;
+            border: 2px solid rgba(34,211,238,0.8);
+        }
+        
+        .selected-language-name {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(34,211,238,0.5);
+        }
     </style>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
@@ -410,7 +561,6 @@
             const question = document.getElementById('question');
             const startBtn = document.getElementById('start-record');
             const statusEl = document.getElementById('status');
-            let selectedLanguage = null;
             let pollTimer = null;
             const overlayEl = document.getElementById('overlay');
             const overlayText = document.getElementById('overlay-text');
@@ -419,7 +569,6 @@
             // Kamera önizlemesi elementleri
             const cameraPreview = document.getElementById('camera-preview');
             const cameraStatus = document.getElementById('camera-status');
-            const langsSection = document.getElementById('langs-section');
             const cameraSection = document.getElementById('camera-section');
             const countdownOverlay = document.getElementById('countdown-overlay');
             const countdownNumber = document.getElementById('countdown-number');
@@ -428,20 +577,180 @@
             let cameraActive = false;
             let countdownInterval = null;
             
+            // Dil ve bayrak eşleştirmesi
+            const languageData = [
+                { lang: 'English', flag: 'fi-us', name: 'İngilizce' },
+                { lang: 'Spanish', flag: 'fi-es', name: 'İspanyolca' },
+                { lang: 'Chinese', flag: 'fi-cn', name: 'Çince' },
+                { lang: 'Hindi', flag: 'fi-in', name: 'Hintçe' },
+                { lang: 'Arabic', flag: 'fi-sa', name: 'Arapça' },
+                { lang: 'Portuguese', flag: 'fi-pt', name: 'Portekizce' },
+                { lang: 'Russian', flag: 'fi-ru', name: 'Rusça' },
+                { lang: 'Japanese', flag: 'fi-jp', name: 'Japonca' },
+                { lang: 'Turkish', flag: 'fi-tr', name: 'Türkçe' },
+                { lang: 'French', flag: 'fi-fr', name: 'Fransızca' },
+                { lang: 'German', flag: 'fi-de', name: 'Almanca' },
+                { lang: 'Italian', flag: 'fi-it', name: 'İtalyanca' },
+                { lang: 'Dutch', flag: 'fi-nl', name: 'Felemenkçe' },
+                { lang: 'Polish', flag: 'fi-pl', name: 'Lehçe' },
+                { lang: 'Korean', flag: 'fi-kr', name: 'Korece' },
+                { lang: 'Danish', flag: 'fi-dk', name: 'Danca' },
+                { lang: 'Romanian', flag: 'fi-ro', name: 'Rumence' },
+                { lang: 'Filipino', flag: 'fi-ph', name: 'Filipince' },
+                { lang: 'Swedish', flag: 'fi-se', name: 'İsveççe' },
+                { lang: 'Indonesian', flag: 'fi-id', name: 'Endonezce' },
+                { lang: 'Ukrainian', flag: 'fi-ua', name: 'Ukraynaca' },
+                { lang: 'Greek', flag: 'fi-gr', name: 'Yunanca' },
+                { lang: 'Czech', flag: 'fi-cz', name: 'Çekçe' },
+                { lang: 'Bulgarian', flag: 'fi-bg', name: 'Bulgarca' },
+                { lang: 'Slovak', flag: 'fi-sk', name: 'Slovakça' },
+                { lang: 'Croatian', flag: 'fi-hr', name: 'Hırvatça' },
+                { lang: 'Finnish', flag: 'fi-fi', name: 'Fince' }
+            ];
+            
+            // Ağırlıklı dil seçimi için
+            const popularLanguages = [
+                'English', 'English', 'English', 'English', 'English', 'English', 'English', 'English',
+                'Spanish', 'Spanish', 'Spanish', 'Spanish', 'Spanish',
+                'Chinese', 'Chinese', 'Chinese', 'Chinese',
+                'Hindi', 'Hindi', 'Hindi',
+                'Arabic', 'Arabic', 'Arabic',
+                'Portuguese', 'Portuguese', 'Portuguese',
+                'Russian', 'Russian', 'Russian',
+                'Japanese', 'Japanese', 'Japanese',
+                'Turkish', 'Turkish', 'Turkish',
+                'French', 'French', 'French', 'French', 'French',
+                'German', 'German', 'German', 'German', 'German',
+                'Italian', 'Italian', 'Italian', 'Italian', 'Italian',
+                'Dutch', 'Dutch', 'Dutch', 'Dutch', 'Dutch',
+                'Polish', 'Korean', 'Danish', 'Romanian', 'Filipino', 'Swedish', 'Indonesian', 
+                'Ukrainian', 'Greek', 'Czech', 'Bulgarian', 'Slovak', 'Croatian', 'Finnish'
+            ];
+            
+            function getRandomLanguage() {
+                return popularLanguages[Math.floor(Math.random() * popularLanguages.length)];
+            }
+            
+            function getLanguageData(lang) {
+                return languageData.find(item => item.lang === lang) || languageData[0];
+            }
+            
+            function createFlagItem(langData) {
+                const div = document.createElement('div');
+                div.className = 'flag-item';
+                div.innerHTML = `
+                    <span class="flag fi ${langData.flag}"></span>
+                    <span class="lang-name">${langData.name}</span>
+                `;
+                return div;
+            }
+            
+            function buildFlagTrack() {
+                const flagTrack = document.getElementById('flag-track');
+                flagTrack.innerHTML = '';
+                
+                // 3 kez tekrarla (sonsuz döngü için)
+                for (let i = 0; i < 3; i++) {
+                    languageData.forEach(langData => {
+                        flagTrack.appendChild(createFlagItem(langData));
+                    });
+                }
+            }
+            
+            function startFlagAnimation() {
+                const flagTrack = document.getElementById('flag-track');
+                const selectedLanguageDisplay = document.getElementById('selected-language-display');
+                const selectedFlag = document.getElementById('selected-flag');
+                const selectedLanguageName = document.getElementById('selected-language-name');
+                
+                // Başlangıçta seçilen dili gizle
+                selectedLanguageDisplay.style.display = 'none';
+                
+                // 1. Aşama: Çok hızlı kayma (3 saniye)
+                flagTrack.classList.add('very-fast');
+                flagTrack.classList.remove('fast', 'medium', 'slow');
+                
+                setTimeout(() => {
+                    // 2. Aşama: Hızlı kayma (4 saniye)
+                    flagTrack.classList.remove('very-fast');
+                    flagTrack.classList.add('fast');
+                    
+                    setTimeout(() => {
+                        // 3. Aşama: Orta hız kayma (5 saniye)
+                        flagTrack.classList.remove('fast');
+                        flagTrack.classList.add('medium');
+                        
+                        setTimeout(() => {
+                            // 4. Aşama: Yavaş kayma (4 saniye)
+                            flagTrack.classList.remove('medium');
+                            flagTrack.classList.add('slow');
+                            
+                            setTimeout(() => {
+                                // 5. Aşama: Animasyonu durdur
+                                flagTrack.classList.remove('slow');
+                                
+                                // Kısa bir gecikme sonra seçici okun altındaki dili bul
+                                setTimeout(() => {
+                                    const selectedLang = getLanguageUnderSelector();
+                                    const selectedLangData = getLanguageData(selectedLang);
+                                    
+                                    // Seçilen dili göster
+                                    selectedFlag.className = `flag fi ${selectedLangData.flag}`;
+                                    selectedLanguageName.textContent = selectedLangData.name;
+                                    selectedLanguageDisplay.style.display = 'flex';
+                                    
+                                    // Kayıt butonunu aktif et
+                                    startBtn.disabled = false;
+                                    startBtn.textContent = 'Videoya Başla';
+                                    
+                                    // Seçilen dili global değişkende sakla
+                                    window.selectedLanguage = selectedLang;
+                                    
+                                }, 300); // 300ms gecikme - animasyon tamamen dursun
+                                
+                            }, 4000); // Yavaş animasyon 4 saniye
+                            
+                        }, 5000); // Orta hız animasyon 5 saniye
+                        
+                    }, 4000); // Hızlı animasyon 4 saniye
+                    
+                }, 3000); // Çok hızlı animasyon 3 saniye
+            }
+            
+            function getLanguageUnderSelector() {
+                // Seçici okun altındaki dili bul
+                const flagTrack = document.getElementById('flag-track');
+                const flagItems = flagTrack.querySelectorAll('.flag-item');
+                const trackRect = flagTrack.getBoundingClientRect();
+                const centerX = trackRect.left + trackRect.width / 2;
+                
+                // Seçici okun altındaki bayrağı bul
+                for (let i = 0; i < flagItems.length; i++) {
+                    const item = flagItems[i];
+                    const itemRect = item.getBoundingClientRect();
+                    
+                    // Seçici ok bu bayrağın üzerinde mi?
+                    if (centerX >= itemRect.left && centerX <= itemRect.right) {
+                        // Bu bayrağın dilini döndür
+                        const languageIndex = i % languageData.length;
+                        return languageData[languageIndex].lang;
+                    }
+                }
+                
+                // Fallback: ilk dili döndür
+                return languageData[0].lang;
+            }
+            
 
             function resetToStart() {
                 // Ekranı başa döndür
                 step2.classList.add('hidden');
                 step1.classList.remove('hidden');
-                // Seçimleri temizle
-                document.querySelectorAll('.lang-card').forEach(c => c.classList.remove('selected'));
-                selectedLanguage = null;
                 startBtn.disabled = true;
                 startBtn.textContent = 'Videoya Başla';
                 statusEl.textContent = '';
                 overlayEl.style.display = 'none';
-                // Dil seçeneklerini göster, kamerayı gizle
-                langsSection.style.display = 'grid';
+                // Kamerayı gizle
                 cameraSection.style.display = 'none';
                 // Kamerayı kapat
                 stopCameraPreview();
@@ -601,9 +910,19 @@
                     setTimeout(() => nameInput.style.boxShadow = '', 220);
                     return;
                 }
-                question.textContent = `Hangi dilde klonlama yapmak istiyorsunuz, ${name}?`;
+                question.textContent = `Merhaba ${name}! Bayraklar arasından bir dil seçilecek...`;
                 step1.classList.add('hidden');
                 step2.classList.remove('hidden');
+                
+                // Bayrak track'ini oluştur
+                buildFlagTrack();
+                
+                // Bayrak animasyonunu başlat
+                startFlagAnimation();
+                
+                // Kayıt butonunu başlangıçta devre dışı bırak
+                startBtn.disabled = true;
+                startBtn.textContent = 'Dil seçiliyor...';
             }
 
             form.addEventListener('submit', (e) => {
@@ -612,26 +931,20 @@
             });
             document.getElementById('enter').addEventListener('click', proceed);
 
-            document.querySelectorAll('.lang-card').forEach(card => {
-                card.addEventListener('click', () => {
-                    selectedLanguage = card.getAttribute('data-lang');
-                    document.querySelectorAll('.lang-card').forEach(c => c.classList.remove('selected'));
-                    card.classList.add('selected');
-                    startBtn.disabled = false;
-                    statusEl.textContent = `Seçilen dil: ${selectedLanguage}`;
-                });
-            });
-
             startBtn.addEventListener('click', async () => {
                 const name = nameInput.value.trim();
-                if (!name || !selectedLanguage) return;
+                if (!name) return;
+                
+                // Seçilen dili al (bayrak animasyonundan)
+                const selectedLanguage = window.selectedLanguage || getRandomLanguage();
+                const selectedLangData = getLanguageData(selectedLanguage);
+                
                 startBtn.disabled = true;
                 startBtn.textContent = 'Başlatılıyor...';
-                statusEl.textContent = 'Kamera açılıyor ve 20 saniyelik kayıt başlatılıyor...';
+                statusEl.textContent = `Kamera açılıyor ve 20 saniyelik kayıt başlatılıyor... (${selectedLangData.name})`;
                 
                 try {
-                    // Dil seçeneklerini gizle, kamera bölümünü göster
-                    langsSection.style.display = 'none';
+                    // Kamera bölümünü göster
                     cameraSection.style.display = 'flex';
                     
                     // Kamera önizlemesini başlat
@@ -644,7 +957,7 @@
                     });
                     const data = await res.json();
                     if (data && data.started) {
-                        statusEl.textContent = 'Kayıt başladı - Kendinizi görebilirsiniz';
+                        statusEl.textContent = `Kayıt başladı - Kendinizi görebilirsiniz (${selectedLangData.name})`;
                         startBtn.textContent = 'Kayıt Devam Ediyor';
                         if (data.job_id) {
                             // Kayıt durumunu periyodik olarak sor
@@ -655,16 +968,14 @@
                         statusEl.textContent = 'Kayıt başlatılamadı.';
                         startBtn.textContent = 'Videoya Başla';
                         startBtn.disabled = false;
-                        // Hata durumunda dil seçeneklerini geri göster
-                        langsSection.style.display = 'grid';
+                        // Hata durumunda kamerayı gizle
                         cameraSection.style.display = 'none';
                     }
                 } catch (err) {
                     statusEl.textContent = 'Bir hata oluştu. Lütfen tekrar deneyin.';
                     startBtn.textContent = 'Videoya Başla';
                     startBtn.disabled = false;
-                    // Hata durumunda dil seçeneklerini geri göster
-                    langsSection.style.display = 'grid';
+                    // Hata durumunda kamerayı gizle
                     cameraSection.style.display = 'none';
                 }
             });
@@ -718,39 +1029,21 @@
 
             <div id="step-2" class="step hidden">
                 <div class="title">Dil Seçimi</div>
-                <div id="question" class="question">Hangi dilde klonlama yapmak istiyorsunuz?</div>
-
-                <div class="langs" id="langs-section">
-                    <div class="lang-card" data-lang="English"><span class="flag fi fi-us"></span> <span class="lang-name">İngilizce</span></div>
-                    <div class="lang-card" data-lang="Spanish"><span class="flag fi fi-es"></span> <span class="lang-name">İspanyolca</span></div>
-                    <div class="lang-card" data-lang="French"><span class="flag fi fi-fr"></span> <span class="lang-name">Fransızca</span></div>
-                    <div class="lang-card" data-lang="Hindi"><span class="flag fi fi-in"></span> <span class="lang-name">Hintçe</span></div>
-                    <div class="lang-card" data-lang="Italian"><span class="flag fi fi-it"></span> <span class="lang-name">İtalyanca</span></div>
-                    <div class="lang-card" data-lang="German"><span class="flag fi fi-de"></span> <span class="lang-name">Almanca</span></div>
-                    <div class="lang-card" data-lang="Polish"><span class="flag fi fi-pl"></span> <span class="lang-name">Lehçe</span></div>
-                    <div class="lang-card" data-lang="Portuguese"><span class="flag fi fi-pt"></span> <span class="lang-name">Portekizce</span></div>
-                    <div class="lang-card" data-lang="Chinese"><span class="flag fi fi-cn"></span> <span class="lang-name">Çince</span></div>
-                    <div class="lang-card" data-lang="Japanese"><span class="flag fi fi-jp"></span> <span class="lang-name">Japonca</span></div>
-                    <div class="lang-card" data-lang="Dutch"><span class="flag fi fi-nl"></span> <span class="lang-name">Felemenkçe</span></div>
-                    <div class="lang-card" data-lang="Turkish"><span class="flag fi fi-tr"></span> <span class="lang-name">Türkçe</span></div>
-                    <div class="lang-card" data-lang="Korean"><span class="flag fi fi-kr"></span> <span class="lang-name">Korece</span></div>
-                    <div class="lang-card" data-lang="Danish"><span class="flag fi fi-dk"></span> <span class="lang-name">Danca</span></div>
-                    <div class="lang-card" data-lang="Arabic"><span class="flag fi fi-sa"></span> <span class="lang-name">Arapça</span></div>
-                    <div class="lang-card" data-lang="Romanian"><span class="flag fi fi-ro"></span> <span class="lang-name">Rumence</span></div>
-                    <div class="lang-card" data-lang="Mandarin"><span class="flag fi fi-cn"></span> <span class="lang-name">Mandarince</span></div>
-                    <div class="lang-card" data-lang="Filipino"><span class="flag fi fi-ph"></span> <span class="lang-name">Filipince</span></div>
-                    <div class="lang-card" data-lang="Swedish"><span class="flag fi fi-se"></span> <span class="lang-name">İsveççe</span></div>
-                    <div class="lang-card" data-lang="Indonesian"><span class="flag fi fi-id"></span> <span class="lang-name">Endonezce</span></div>
-                    <div class="lang-card" data-lang="Ukrainian"><span class="flag fi fi-ua"></span> <span class="lang-name">Ukraynaca</span></div>
-                    <div class="lang-card" data-lang="Greek"><span class="flag fi fi-gr"></span> <span class="lang-name">Yunanca</span></div>
-                    <div class="lang-card" data-lang="Czech"><span class="flag fi fi-cz"></span> <span class="lang-name">Çekçe</span></div>
-                    <div class="lang-card" data-lang="Bulgarian"><span class="flag fi fi-bg"></span> <span class="lang-name">Bulgarca</span></div>
-                    <div class="lang-card" data-lang="Malay"><span class="flag fi fi-my"></span> <span class="lang-name">Malayca</span></div>
-                    <div class="lang-card" data-lang="Slovak"><span class="flag fi fi-sk"></span> <span class="lang-name">Slovakça</span></div>
-                    <div class="lang-card" data-lang="Croatian"><span class="flag fi fi-hr"></span> <span class="lang-name">Hırvatça</span></div>
-                    <div class="lang-card" data-lang="Tamil"><span class="flag fi fi-lk"></span> <span class="lang-name">Tamilce</span></div>
-                    <div class="lang-card" data-lang="Finnish"><span class="flag fi fi-fi"></span> <span class="lang-name">Fince</span></div>
-                    <div class="lang-card" data-lang="Russian"><span class="flag fi fi-ru"></span> <span class="lang-name">Rusça</span></div>
+                <div id="question" class="question">Bayraklar arasından bir dil seçilecek...</div>
+                
+                <!-- Bayrak animasyonu -->
+                <div class="flag-animation-container">
+                    <div class="flag-track" id="flag-track">
+                        <!-- Bayraklar buraya dinamik olarak eklenecek -->
+                    </div>
+                    <div class="flag-selector" id="flag-selector">
+                        <div class="selector-arrow">↓</div>
+                    </div>
+                </div>
+                
+                <div class="selected-language-display" id="selected-language-display" style="display: none;">
+                    <div class="selected-flag" id="selected-flag"></div>
+                    <div class="selected-language-name" id="selected-language-name"></div>
                 </div>
 
                 <div class="camera-section" id="camera-section" style="display: none;">
@@ -775,8 +1068,8 @@
                 </div>
 
                 <div class="footer">
-                    <span class="chip">Toplam 30 dil</span>
-                    <span class="muted">Seçiminiz anında işlenecektir.</span>
+                    <span class="chip">Rastgele Dil Seçimi</span>
+                    <span class="muted">En çok konuşulan 9 dil + özel diller ağırlıklı, 24 dil toplam.</span>
                 </div>
             </div>
         </div>

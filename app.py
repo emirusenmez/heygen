@@ -1238,6 +1238,7 @@ def record_with_opencv_and_audio(output_path: str, device_index: int = 0, durati
         # Video kayıt döngüsü (geri sayım sonrası başlar)
         baslangic_zamani = time.time()
         
+        frame_count = 0
         while True:
             # Frame oku
             ret, frame = cap.read()
@@ -1254,6 +1255,9 @@ def record_with_opencv_and_audio(output_path: str, device_index: int = 0, durati
             
             # Frame'i videoya yaz
             out.write(frame)
+            
+            # Frame sayacını artır
+            frame_count += 1
             
             # Ekranda göster
             cv2.imshow('Kamera Kayıt', frame)
