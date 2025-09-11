@@ -94,7 +94,7 @@ def overlay_gif_on_frame(frame: np.ndarray, gif_frames: list, gif_frame_index: i
         print(f"⚠️ GIF overlay sınırlar dışında: ({x}, {y})")
         return frame
     
-    # Overlay ekle (alpha channel ile)
+    # Overlay ekle (alpha channel ile şeffaflık)
     try:
         # GIF frame'in alpha channel'ını kontrol et
         if gif_frame.shape[2] == 4:  # BGRA formatında
@@ -102,16 +102,26 @@ def overlay_gif_on_frame(frame: np.ndarray, gif_frames: list, gif_frame_index: i
             gif_bgr = gif_frame[:, :, :3]  # BGR kanalları
             gif_alpha = gif_frame[:, :, 3] / 255.0  # Alpha channel (0-1)
             
-            # Alpha blending ile overlay ekle
+            # Beyaz arka planı şeffaf yap (beyaz pikselleri şeffaf yap)
+            # Beyaz pikselleri tespit et (BGR değerleri yüksek olan)
+            white_threshold = 240  # Beyaz eşik değeri
+            is_white = (gif_bgr[:, :, 0] > white_threshold) & \
+                      (gif_bgr[:, :, 1] > white_threshold) & \
+                      (gif_bgr[:, :, 2] > white_threshold)
+            
+            # Beyaz piksellerin alpha değerini 0 yap (tamamen şeffaf)
+            gif_alpha[is_white] = 0.0
+            
+            # Alpha blending ile overlay ekle (şeffaf arka plan korunur)
             for c in range(3):  # BGR kanalları için
                 frame[y:y+gif_h, x:x+gif_w, c] = (
                     frame[y:y+gif_h, x:x+gif_w, c] * (1 - gif_alpha) + 
                     gif_bgr[:, :, c] * gif_alpha
                 )
         else:
-            # Alpha channel yoksa normal overlay
+            # Alpha channel yoksa, şeffaflık ile overlay
             if alpha < 1.0:
-                # Şeffaflık ile overlay
+                # Şeffaflık ile overlay (arka plan korunur)
                 overlay = frame[y:y+gif_h, x:x+gif_w].copy()
                 blended = cv2.addWeighted(overlay, 1-alpha, gif_frame, alpha, 0)
                 frame[y:y+gif_h, x:x+gif_w] = blended

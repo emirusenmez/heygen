@@ -31,12 +31,12 @@ RAW_OUTPUT_DIR = r'/Users/emirefeusenmez/code/heygen/outputs'
 GIF_PATH = '/Users/emirefeusenmez/code/heygen/gif.gif'
 GIF_SIZE = (200, 200)  # 200x200 piksel
 GIF_POSITION = (0, 0)  # (0,0) = sağ üst köşe
-GIF_ALPHA = 1.0  # Şeffaflık (1.0 = tam opak)
+GIF_ALPHA = 1.0  # Şeffaflık (1.0 = tam opak, arka plan tamamen şeffaf)
 GIF_DURATION = 20.0  # GIF'in bir turu kaç saniyede tamamlanacak
 
 # Fligram overlay ayarları
 FLIGRAM_PATH = '/Users/emirefeusenmez/code/heygen/fligram.png'
-FLIGRAM_SIZE = (1280, 720)  # Tam ekran boyut (video boyutu)
+FLIGRAM_SIZE = None  # Video boyutuna göre dinamik olarak hesaplanacak
 FLIGRAM_POSITION = (2, 2)  # (2,2) = merkez
 FLIGRAM_ALPHA = 0.3  # Şeffaflık (0.3 = %30 opak - watermark için)
 
@@ -209,12 +209,19 @@ def load_gif_overlay():
         print(f"❌ GIF overlay yükleme hatası: {e}")
         return None
 
-def load_fligram_overlay():
-    """Fligram overlay'i yükle"""
+def load_fligram_overlay(frame_width: int = 1280, frame_height: int = 720):
+    """Fligram overlay'i yükle - video yüksekliğine göre 1:1 oranında boyut"""
     global FLIGRAM_IMAGE, FLIGRAM_LOADED
     
-    if FLIGRAM_LOADED:
-        return FLIGRAM_IMAGE
+    # Video yüksekliğine göre 1:1 oranında boyut hesapla
+    # Video yüksekliği kadar genişlik ve yükseklik (1:1 oran)
+    fligram_size = (frame_height, frame_height)  # 1:1 oran (video yüksekliği kadar)
+    
+    if FLIGRAM_LOADED and FLIGRAM_IMAGE is not None:
+        # Mevcut boyut kontrolü
+        current_h, current_w = FLIGRAM_IMAGE.shape[:2]
+        if current_w == frame_height and current_h == frame_height:
+            return FLIGRAM_IMAGE
     
     try:
         if os.path.exists(FLIGRAM_PATH):
@@ -226,13 +233,13 @@ def load_fligram_overlay():
             if pil_image.mode != 'RGBA':
                 pil_image = pil_image.convert('RGBA')
             
-            # Hedef boyuta resize et
-            pil_image = pil_image.resize(FLIGRAM_SIZE, Image.Resampling.LANCZOS)
+            # 1:1 oranında resize et (genişlik = yükseklik = video genişliği)
+            pil_image = pil_image.resize(fligram_size, Image.Resampling.LANCZOS)
             
             # PIL'den OpenCV formatına çevir (RGBA -> BGRA)
             FLIGRAM_IMAGE = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGBA2BGRA)
             FLIGRAM_LOADED = True
-            print(f"✅ Fligram overlay yüklendi: {FLIGRAM_SIZE}")
+            print(f"✅ Fligram overlay yüklendi: {fligram_size} (1:1 oran, video yüksekliği)")
             return FLIGRAM_IMAGE
         else:
             print(f"⚠️ Fligram dosyası bulunamadı: {FLIGRAM_PATH}")
@@ -242,11 +249,14 @@ def load_fligram_overlay():
         return None
 
 def add_fligram_to_frame(frame):
-    """Frame'e Fligram overlay ekle"""
+    """Frame'e Fligram overlay ekle - 1:1 oranında ve tam merkezde"""
     global FLIGRAM_IMAGE
     
+    # Frame boyutlarını al
+    frame_height, frame_width = frame.shape[:2]
+    
     if FLIGRAM_IMAGE is None:
-        FLIGRAM_IMAGE = load_fligram_overlay()
+        FLIGRAM_IMAGE = load_fligram_overlay(frame_width, frame_height)
     
     if FLIGRAM_IMAGE is not None:
         return overlay_gif_on_frame(frame, [FLIGRAM_IMAGE], 0, FLIGRAM_POSITION, FLIGRAM_ALPHA)
@@ -937,9 +947,9 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             time.sleep(1)
         print("🎬 Kayıt başladı!")
         
-        # 4. 2 saniye daha bekle (kayıt süresine dahil değil)
-        print("2 saniye daha bekleniyor...")
-        time.sleep(2)
+        # 4. 1 saniye daha bekle (kayıt süresine dahil değil)
+        print("1 saniye daha bekleniyor...")
+        time.sleep(1)
         print("🎬 Gerçek kayıt başladı!")
         
         # 5. Ses kaydını başlat (ayrı thread'de)
@@ -951,12 +961,13 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             audio_thread = threading.Thread(target=ses_kaydet, args=(duration_sec, audio_file, device_index), daemon=True)
             audio_thread.start()
         
-        # 6. Video kayıt döngüsü (geri sayım + 2 saniye sonrası başlar)
+        # 6. Video kayıt döngüsü (geri sayım + 1 saniye sonrası başlar)
         print("🎬 Video kaydı başlıyor...")
         start_time = time.time()
         frame_count = 0
+        target_frames = int(duration_sec * 30)  # 20 saniye * 30 FPS = 600 frame
         
-        while True:
+        while frame_count < target_frames:
             # Frame oku
             ret, frame = cap.read()
             
@@ -978,14 +989,13 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             
             frame_count += 1
             elapsed = time.time() - start_time
-            remaining = duration_sec - elapsed
             
             # İlerleme göster (her saniye)
             if frame_count % 30 == 0:
-                print(f"📹 Kayıt: {elapsed:.1f}s / {duration_sec}s (Kalan: {remaining:.1f}s)")
+                print(f"📹 Kayıt: {frame_count}/{target_frames} frame ({elapsed:.1f}s)")
             
-            # Süre doldu mu kontrol et
-            if elapsed >= duration_sec:
+            # Frame sayısına göre kontrol (daha kesin)
+            if frame_count >= target_frames:
                 break
         
         # 5. Video kaydını bitir
@@ -1798,7 +1808,7 @@ def spin():
     # Kalan süre: Rastgele diller (çok hızlı)
     # 10 saniye = 10000ms, 25 dil * 100ms = 2500ms
     # Kalan 7500ms / 100ms = 75 adım daha
-    for i in range(20):
+    for i in range(10):
         # Rastgele dil seçimi
         lang = random.choice(languageData)
         steps.append({
