@@ -40,7 +40,7 @@ FLIGRAM_PATH = '/Users/emirefeusenmez/code/heygen/fligram.png'
 FLIGRAM_SIZE = None  # Video boyutuna göre dinamik olarak hesaplanacak
 FLIGRAM_POSITION = (2, 2)  # (2,2) = merkez
 FLIGRAM_ALPHA = 0.3  # Şeffaflık (0.3 = %30 opak - watermark için)
-FLIGRAM_ENABLED = False  # Fligram overlay'i devre dışı
+FLIGRAM_ENABLED = True  # Fligram overlay'i aktif
 
 
 app = Flask(__name__)
