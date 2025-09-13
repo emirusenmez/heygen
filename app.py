@@ -1,4 +1,12 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory, Response
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email import encoders
+import ssl
+import certifi
+import msal  # type: ignore
 import threading
 import datetime
 import os
@@ -24,8 +32,8 @@ HEYGEN_API_KEY_FALLBACK = 'N2Q5OWZiNGM2OWE1NDNlZTkwNzQyMGQ3OWY2Yzc2ZWItMTc1NzQwN
 
 TRANSLATED_OUTPUT_DIR = r'/Users/emirefeusenmez/Library/CloudStorage/OneDrive-DemirörenTeknoloji-Hürriyet/videos'
 
-# Ham videoların kaydedileceği klasör (yerel)
-RAW_OUTPUT_DIR = r'/Users/emirefeusenmez/code/heygen/outputs'
+# Ham videoların kaydedileceği klasör (OneDrive)
+RAW_OUTPUT_DIR = r'/Users/emirefeusenmez/Library/CloudStorage/OneDrive-DemirörenTeknoloji-Hürriyet/Masaüstü/tr'
 
 # GIF overlay ayarları
 GIF_PATH = '/Users/emirefeusenmez/code/heygen/gif.gif'
@@ -60,6 +68,200 @@ def ensure_output_dir(path: str) -> None:
     directory = os.path.dirname(path)
     if directory and not os.path.exists(directory):
         os.makedirs(directory, exist_ok=True)
+
+
+def _send_email_smtp(recipient_email: str, subject: str, html_body: str, attachment_path: str | None = None) -> bool:
+    """Basit SMTP e-posta gönderimi (O365 varsayılan). Kimlik bilgileri ortam değişkenlerinden okunur.
+
+    Gerekli env:
+      SMTP_HOST (varsayılan smtp.office365.com)
+      SMTP_PORT (varsayılan 587)
+      SMTP_USER (gönderici e-posta)
+      SMTP_PASSWORD
+    """
+    smtp_host = os.getenv('SMTP_HOST', 'smtp.office365.com')
+    try:
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+    except Exception:
+        smtp_port = 587
+    smtp_user = os.getenv('SMTP_USER') or os.getenv('SMTP_USERNAME')
+    smtp_pass = os.getenv('SMTP_PASSWORD') or os.getenv('SMTP_PASS')
+
+    if not smtp_user or not smtp_pass:
+        print('SMTP kimlik bilgileri bulunamadı (SMTP_USER/SMTP_PASSWORD). E-posta atlanıyor.')
+        return False
+
+
+def _send_email_graph(recipient_email: str, subject: str, html_body: str, attachment_path: str | None = None) -> bool:
+    """Microsoft Graph API ile e-posta gönder.
+
+    Gerekli env:
+      GRAPH_TENANT_ID, GRAPH_CLIENT_ID, GRAPH_CLIENT_SECRET
+      GRAPH_SENDER (gönderen mailbox, genelde kullanıcı veya shared mailbox UPN)
+    """
+    tenant_id = os.getenv('GRAPH_TENANT_ID')
+    client_id = os.getenv('GRAPH_CLIENT_ID')
+    client_secret = os.getenv('GRAPH_CLIENT_SECRET')
+    sender_upn = os.getenv('GRAPH_SENDER')
+    if not (tenant_id and client_id and client_secret and sender_upn):
+        return False
+
+    try:
+        authority = f"https://login.microsoftonline.com/{tenant_id}"
+        app_conf = msal.ConfidentialClientApplication(
+            client_id, authority=authority, client_credential=client_secret
+        )
+        scopes = ["https://graph.microsoft.com/.default"]
+        token = app_conf.acquire_token_silent(scopes, account=None) or app_conf.acquire_token_for_client(scopes=scopes)
+        access_token = token.get('access_token')
+        if not access_token:
+            print(f"Graph token alınamadı: {token}")
+            return False
+
+        # Mesaj gövdesi
+        message = {
+            "message": {
+                "subject": subject,
+                "body": {"contentType": "HTML", "content": html_body},
+                "toRecipients": [{"emailAddress": {"address": recipient_email}}]
+            },
+            "saveToSentItems": True
+        }
+
+        # Basit: eki link olarak göndermeyi tercih edin; ek eklemek gerekirse /attachments ile yüklenmeli
+        import requests as _rq
+        resp = _rq.post(
+            f"https://graph.microsoft.com/v1.0/users/{sender_upn}/sendMail",
+            headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},
+            data=json.dumps(message)
+        )
+        if resp.status_code in (202, 200):
+            print("Graph: e-posta gönderildi")
+            return True
+        print(f"Graph sendMail hata: {resp.status_code} {resp.text[:200]}")
+        return False
+    except Exception as e:
+        print(f"Graph gönderim hatası: {e}")
+        return False
+
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = smtp_user
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(html_body, 'html'))
+
+        if attachment_path and os.path.exists(attachment_path):
+            try:
+                with open(attachment_path, 'rb') as f:
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(f.read())
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(attachment_path)}"')
+                msg.attach(part)
+            except Exception as attach_err:
+                print(f'E-posta eki eklenemedi: {attach_err}')
+
+        context = ssl.create_default_context(cafile=certifi.where())
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()
+            server.starttls(context=context)
+            server.ehlo()
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(smtp_user, [recipient_email], msg.as_string())
+        print(f"E-posta gönderildi: {recipient_email}")
+        return True
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"SMTP auth hatası: {e}")
+        return False
+    except Exception as e:
+        print(f"E-posta gönderim hatası: {e}")
+        return False
+
+
+# ------- Mail HTML yardımcıları (logo ve gövde oluşturma) -------
+def _encode_image_to_base64(image_path: str) -> str | None:
+    try:
+        with open(image_path, 'rb') as f:
+            return base64.b64encode(f.read()).decode('utf-8')
+    except Exception:
+        return None
+
+
+def _build_branded_email_body(default_body: str) -> str:
+    base_dir = os.getcwd()
+    n_sosyal_path = os.path.join(base_dir, 'sosyal', 'nsosyal.png')
+    insta_path = os.path.join(base_dir, 'sosyal', 'insta.png')
+    x_path = os.path.join(base_dir, 'sosyal', 'x.png')
+
+    n_sosyal_logo = _encode_image_to_base64(n_sosyal_path)
+    insta_logo = _encode_image_to_base64(insta_path)
+    x_logo = _encode_image_to_base64(x_path)
+
+    n_sosyal_img = (
+        f'<img src="data:image/png;base64,{n_sosyal_logo}" alt="N Sosyal" style="width:24px;height:24px;margin-right:10px;">'
+        if n_sosyal_logo else '<span style="font-size:24px;margin-right:10px;">📱</span>'
+    )
+    instagram_img = (
+        f'<img src="data:image/png;base64,{insta_logo}" alt="Instagram" style="width:24px;height:24px;margin-right:10px;">'
+        if insta_logo else '<span style="font-size:24px;margin-right:10px;">📷</span>'
+    )
+    x_img = (
+        f'<img src="data:image/png;base64,{x_logo}" alt="X" style="width:24px;height:24px;margin-right:10px;">'
+        if x_logo else '<span style="font-size:24px;margin-right:10px;">🐦</span>'
+    )
+
+    # Varsayılan bilgi metnini üstte tut, altına link bölümlerini ekle
+    return (
+        f"<div style=\"margin:0;padding:0;background-color:#ffffff;\">"
+        f"  <div style=\"max-width:560px;margin:0 auto;padding:16px;"
+        f"              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111;\">"
+        f"    {default_body}"
+        f"    <div style=\"display:flex;align-items:center;gap:8px;margin:16px 0 8px;\">{n_sosyal_img}<span style=\"font-weight:700;font-size:16px;\">N Sosyal</span></div>"
+        f"    <div style=\"font-size:14px;line-height:1.5;color:#111;\">"
+        f"      <a href=\"https://sosyal.teknofest.app/@hurriyet\" style=\"color:#111;\">Hürriyet</a> | "
+        f"      <a href=\"https://sosyal.teknofest.app/@milliyet\" style=\"color:#111;\">Milliyet</a> | "
+        f"      <a href=\"https://sosyal.teknofest.app/@cnnturkcom\" style=\"color:#111;\">CNN Türk</a> | "
+        f"      <a href=\"https://sosyal.teknofest.app/@fanatikcomtr\" style=\"color:#111;\">Fanatik</a> | "
+        f"      <a href=\"https://sosyal.teknofest.app/@postacomtr\" style=\"color:#111;\">Posta</a> | "
+        f"      <a href=\"https://sosyal.teknofest.app/@gazetevatan\" style=\"color:#111;\">Vatan</a> | "
+        f"      <a href=\"https://sosyal.teknofest.app/@kanald\" style=\"color:#111;\">Kanal D</a> | "
+        f"      <a href=\"https://sosyal.teknofest.app/@teve2\" style=\"color:#111;\">Teve2</a>"
+        f"    </div>"
+        f"    <div style=\"display:flex;align-items:center;gap:8px;margin:16px 0 8px;\">{instagram_img}<span style=\"font-weight:700;font-size:16px;\">Instagram</span></div>"
+        f"    <div style=\"font-size:14px;line-height:1.5;color:#111;\">"
+        f"      <a href=\"https://www.instagram.com/hurriyetcomtr/\" style=\"color:#111;\">Hürriyet</a> | "
+        f"      <a href=\"https://www.instagram.com/milliyetcomtr/\" style=\"color:#111;\">Milliyet</a> | "
+        f"      <a href=\"https://www.instagram.com/cnnturk/\" style=\"color:#111;\">CNN Türk</a> | "
+        f"      <a href=\"https://www.instagram.com/fanatikcomtr/\" style=\"color:#111;\">Fanatik</a> | "
+        f"      <a href=\"https://www.instagram.com/posta.com.tr/\" style=\"color:#111;\">Posta</a> | "
+        f"      <a href=\"https://www.instagram.com/gazetevatancom/\" style=\"color:#111;\">Vatan</a> | "
+        f"      <a href=\"https://www.instagram.com/kanald/\" style=\"color:#111;\">Kanal D</a> | "
+        f"      <a href=\"https://www.instagram.com/teve2/\" style=\"color:#111;\">Teve2</a>"
+        f"    </div>"
+        f"    <div style=\"display:flex;align-items:center;gap:8px;margin:16px 0 8px;\">{x_img}<span style=\"font-weight:700;font-size:16px;\">X</span></div>"
+        f"    <div style=\"font-size:14px;line-height:1.5;color:#111;\">"
+        f"      <a href=\"https://x.com/Hurriyet\" style=\"color:#111;\">Hürriyet</a> | "
+        f"      <a href=\"https://x.com/milliyet\" style=\"color:#111;\">Milliyet</a> | "
+        f"      <a href=\"https://x.com/cnnturk\" style=\"color:#111;\">CNN Türk</a> | "
+        f"      <a href=\"https://x.com/fanatikcomtr\" style=\"color:#111;\">Fanatik</a> | "
+        f"      <a href=\"https://x.com/postacomtr\" style=\"color:#111;\">Posta</a> | "
+        f"      <a href=\"https://x.com/Vatan\" style=\"color:#111;\">Vatan</a> | "
+        f"      <a href=\"https://x.com/kanald\" style=\"color:#111;\">Kanal D</a> | "
+        f"      <a href=\"https://x.com/teve2Official\" style=\"color:#111;\">Teve2</a>"
+        f"    </div>"
+        f"    <p style=\"font-size:14px;line-height:1.5;margin:16px 0;color:#333;\">Sevgiler,<br/>Demirören Medya Dijital Yayınlar</p>"
+        f"  </div>"
+        f"</div>"
+    )
+
+
+def _derive_attachment_name(video_path: str) -> str:
+    base_name = os.path.basename(video_path)
+    name_root, ext = os.path.splitext(base_name)
+    parts = name_root.split('_')
+    person_name = parts[1] if len(parts) >= 2 else name_root
+    return f"{person_name}{ext or '.mp4'}"
 
 
 def check_camera_permissions():
@@ -754,11 +956,14 @@ def mux_with_ffmpeg(video_path: str, audio_path: str, output_path: str, audio_te
         '-thread_queue_size', '4096', '-i', video_path,
         '-thread_queue_size', '4096', '-i', audio_path,
         '-map', '0:v:0', '-map', '1:a:0',
-        '-c:v', 'copy',
-        '-c:a', 'aac', '-b:a', '192k',
-        '-ar', '48000', '-ac', '1',
+        # Videoyu CFR 30fps yeniden kodla ve süreyi sabitle
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p',
+        '-vsync', 'cfr', '-r', '30',
+        # Sesi kodla ve filtreleri uygula
+        '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '1',
         '-af', ','.join(afilters),
-        '-shortest',  # Kısa olanı al (senkronizasyon için)
+        # Çıkış süresini sabitle
+        '-t', '20',
         '-movflags', '+faststart',
         output_path
     ]
@@ -967,12 +1172,7 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             time.sleep(1)
         print("🎬 Kayıt başladı!")
         
-        # 4. 2 saniye daha bekle (kayıt süresine dahil değil)
-        print("2 saniye daha bekleniyor...")
-        time.sleep(2)
-        print("🎬 Gerçek kayıt başladı!")
-        
-        # 5. Ses kaydını başlat (ayrı thread'de)
+        # 4. Ses ve videoyu AYNI ANDA başlat
         audio_thread = None
         if with_audio:
             print("🎤 Ses kaydı başlatılıyor...")
@@ -1665,7 +1865,7 @@ def _get_caption_url(video_translate_id: str, api_key: str) -> str | None:
     return None
 
 
-def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, translation_id: str = None) -> None:
+def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, translation_id: str = None, recipient_email: str | None = None) -> None:
     # Dil kodlarını Heygen API formatına çevir
     language_map = {
         'tr': 'Turkish',
@@ -1682,6 +1882,10 @@ def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, trans
         'ar': 'Arabic'
     }
     
+    # Geçersiz/boş/Unknown ise English'e düş
+    invalid_langs = {"unknown", "auto", "random", ""}
+    if not safe_lang or safe_lang.lower() in invalid_langs:
+        safe_lang = 'English'
     output_language = language_map.get(safe_lang.lower(), safe_lang)
     api_key = os.getenv('HEYGEN_API_KEY') or HEYGEN_API_KEY_FALLBACK
     if not api_key:
@@ -1777,6 +1981,36 @@ def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, trans
     if translation_id:
         TRANSLATION_JOBS[translation_id] = {"status": "completed", "message": "Çeviri ve altyazı tamamlandı", "output_path": out_path}
 
+    # Çıktıyı e-posta ile gönder (opsiyonel)
+    try:
+        if recipient_email and '@' in recipient_email:
+            subject = f"🎉 Videonuz Hazır: {safe_name}_{safe_lang}.mp4"
+            base_body = (
+                f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Merhaba,</p>"
+                f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Videonuz hazırlandı.</p>"
+                f"<p style=\"font-size:14px;color:#555;margin:0 0 16px;\">Dosya adı: <b>{os.path.basename(out_path)}</b></p>"
+            )
+            html_body = _build_branded_email_body(base_body)
+            # Önce Graph ile linkli gönder, sonra ek olarak düş
+            sent = _send_email_graph(recipient_email, subject, html_body, attachment_path=None)
+            try:
+                file_size = os.path.getsize(out_path)
+            except Exception:
+                file_size = 0
+            if not sent and file_size and file_size <= 20 * 1024 * 1024:
+                sent = _send_email_smtp(recipient_email, subject, html_body, attachment_path=out_path)
+            elif not sent:
+                try:
+                    url = _upload_to_catbox_with_retry(out_path)
+                    html_body_link = _build_branded_email_body(base_body + f"<p>Video linki: <a href='{url}' target='_blank'>İndir</a></p>")
+                    sent = _send_email_graph(recipient_email, subject, html_body_link, attachment_path=None) or _send_email_smtp(recipient_email, subject, html_body_link, attachment_path=None)
+                except Exception as link_err:
+                    print(f"Video link yükleme/gönderim hatası: {link_err}")
+                    sent = False
+            print(f"E-posta gönderim durumu: {sent}")
+    except Exception as mail_err:
+        print(f"E-posta gönderim istisnası: {mail_err}")
+
 
 @app.route('/outputs/<path:filename>')
 def serve_outputs(filename: str):
@@ -1793,6 +2027,48 @@ def serve_brand(filename: str):
 @app.route('/logo.png')
 def serve_logo():
     return send_from_directory(os.getcwd(), 'logo.png', as_attachment=False)
+
+
+# Harici API: video_path ve email alıp mail gönderir
+@app.route('/api/send-email', methods=['POST'])
+def api_send_email():
+    data = request.get_json(silent=True) or {}
+    video_path = (data.get('video_path') or '').strip()
+    email = (data.get('email') or '').strip()
+    subject = (data.get('subject') or '🎉 Videonuz Hazır').strip()
+    custom_html_body = data.get('html_body')
+
+    if not (video_path and os.path.exists(video_path)):
+        return jsonify({'ok': False, 'error': 'video_path bulunamadı'}), 400
+    if not (email and '@' in email):
+        return jsonify({'ok': False, 'error': 'geçersiz email'}), 400
+
+    try:
+        base_body = (
+            f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Merhaba,</p>"
+            f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Videonuz hazırlandı.</p>"
+            f"<p style=\"font-size:14px;color:#555;margin:0 0 16px;\">Dosya adı: <b>{os.path.basename(video_path)}</b></p>"
+        )
+        html_body = custom_html_body or _build_branded_email_body(base_body)
+
+        sent = _send_email_graph(email, subject, html_body, attachment_path=None)
+        try:
+            file_size = os.path.getsize(video_path)
+        except Exception:
+            file_size = 0
+        if not sent and file_size and file_size <= 20 * 1024 * 1024:
+            sent = _send_email_smtp(email, subject, html_body, attachment_path=video_path)
+        elif not sent:
+            try:
+                url = _upload_to_catbox_with_retry(video_path)
+                html_body_link = _build_branded_email_body(base_body + f"<p>Video linki: <a href='{url}' target='_blank'>İndir</a></p>")
+                sent = _send_email_graph(email, subject, html_body_link, attachment_path=None) or _send_email_smtp(email, subject, html_body_link, attachment_path=None)
+            except Exception as link_err:
+                print(f"Video link yükleme/gönderim hatası: {link_err}")
+                sent = False
+        return jsonify({'ok': bool(sent)})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 
 def _maybe_build_public_url(local_path: str) -> str | None:
@@ -1959,7 +2235,13 @@ def stop_preview():
 def start_recording():
     data = request.get_json(silent=True) or {}
     name = (data.get("name") or "kullanici").strip() or "kullanici"
-    language = (data.get("language") or "Unknown").strip() or "Unknown"
+    email = (data.get("email") or "").strip()
+    # Dil belirtilmemişse güvenli bir varsayılan seç (weightedPick veya English)
+    try:
+        default_lang = weightedPick().get('lang', 'English')
+    except Exception:
+        default_lang = 'English'
+    language = (data.get("language") or default_lang).strip() or default_lang
 
     # Dosya adı güvenli hale getir
     safe_name = "".join(ch for ch in name if ch.isalnum() or ch in ("-", "_")).rstrip(" .") or "kullanici"
@@ -1971,7 +2253,7 @@ def start_recording():
     output_path = os.path.join(output_dir, f"webcam_{safe_name}_{safe_lang}_{timestamp}.mp4")
 
     job_id = uuid.uuid4().hex
-    RECORD_JOBS[job_id] = {"status": "recording", "output": output_path}
+    RECORD_JOBS[job_id] = {"status": "recording", "output": output_path, "email": email}
 
     def worker(job_key: str):
         try:
@@ -1992,12 +2274,12 @@ def start_recording():
             # Çeviriyi ayrı thread'de başlat
             print('Çeviri arka planda başlatılıyor...')
             translation_id = uuid.uuid4().hex
-            TRANSLATION_JOBS[translation_id] = {"status": "pending", "message": "Çeviri bekliyor..."}
+            TRANSLATION_JOBS[translation_id] = {"status": "pending", "message": "Çeviri bekliyor...", "email": email}
             
             # Çeviri thread'ini başlat
             translation_thread = threading.Thread(
                 target=translate_with_heygen, 
-                args=(output_path, safe_name, safe_lang, translation_id),
+                args=(output_path, safe_name, safe_lang, translation_id, email if email else None),
                 daemon=True
             )
             translation_thread.start()

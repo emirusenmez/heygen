@@ -1,0 +1,6 @@
+Ses Kaydı - 13.09.2025 11:21:22
+==================================================
+
+Hata: Audio file could not be read as PCM WAV, AIFF/AIFF-C, or Native FLAC; check if file is corrupted or in another format
+
+==================================================

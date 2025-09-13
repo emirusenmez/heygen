@@ -400,6 +400,14 @@
             0% { transform: translateX(0); }
             100% { transform: translateX(-100%); }
         }
+        /* KVKK bilgilendirme - e-posta alanının hemen altında, silik */
+        .kvkk-note {
+            margin-top: 6px;
+            font-size: 12px;
+            color: var(--muted);
+            opacity: 0.65;
+            line-height: 1.4;
+        }
         
         /* Yeni Dil Seçici Tasarımı */
         .language-display {
@@ -477,6 +485,7 @@
         document.addEventListener('DOMContentLoaded', () => {
             const form = document.getElementById('name-form');
             const nameInput = document.getElementById('name');
+            const emailInput = document.getElementById('email');
             const step1 = document.getElementById('step-1');
             const step2 = document.getElementById('step-2');
             const question = document.getElementById('question');
@@ -595,10 +604,11 @@
                     // Kamera önizlemesini başlat
                     await startCameraPreview();
                     
+                    const email = (emailInput && emailInput.value && emailInput.value.trim()) || '';
                     const res = await fetch('/start-recording', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, language: selectedLanguage })
+                        body: JSON.stringify({ name, email, language: selectedLanguage })
                     });
                     const data = await res.json();
                     if (data && data.started) {
@@ -841,11 +851,9 @@
                 question.textContent = `Merhaba ${name}! Çeviri için dil seçiliyor...`;
                 step1.classList.add('hidden');
                 step2.classList.remove('hidden');
-                
-                // Otomatik olarak dil seçimini başlat
-                setTimeout(() => {
-                    startSpin();
-                }, 1000); // 1 saniye bekle, sonra otomatik başlat
+
+                // Aksi halde otomatik dil seçimini başlat
+                setTimeout(() => { startSpin(); }, 600);
             }
 
             form.addEventListener('submit', (e) => {
@@ -876,10 +884,11 @@
                     // Kamera önizlemesini başlat
                     await startCameraPreview();
                     
+                    const email = (emailInput && emailInput.value && emailInput.value.trim()) || '';
                     const res = await fetch('/start-recording', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, language: selectedLanguage })
+                        body: JSON.stringify({ name, email, language: selectedLanguage })
                     });
                     const data = await res.json();
                     if (data && data.started) {
@@ -947,11 +956,16 @@
                     <img src="/logo.png" alt="Demirören Medya" onerror="this.style.opacity=0;" />
                 </div>
                 <div class="title">Hoş geldiniz</div>
-                <div class="subtitle">Lütfen adınızı ve soyadınızı giriniz ve girişe basınız.</div>
+                <br>
                 <form id="name-form" class="name-row">
                     <input id="name" class="input" type="text" placeholder="Adınız ve Soyadınız" autocomplete="name" />
                     <button id="enter" class="btn" type="submit">Giriş</button>
                 </form>
+                <div class="name-row" style="grid-template-columns: 1fr; margin-top: 10px;">
+                    <input id="email" class="input" type="email" placeholder="E-posta (Videonuzu e-posta olarak gelmesini istiyorsanız doldurabilirsiniz)" autocomplete="email" />
+                </div>
+                <br>
+                <div class="kvkk-note">“Görüntüleriniz yalnızca Demirören Medya’nın Teknofest 2025 etkinliği kapsamında kullanılacak olup, 6698 sayılı KVKK uyarınca üçüncü kişilerle paylaşılmayacak ve başka amaçlarla işlenmeyecektir.”</div>
             </div>
 
             <div id="step-2" class="step hidden">
@@ -1001,7 +1015,6 @@
             <div id="overlay-sub" class="sub">15 saniye içinde ana ekrana döneceksiniz</div>
         </div>
     </div>
-    
     <!-- Brand ticker -->
     <div class="brandbar" aria-hidden="true">
         <div class="brandtrack" id="brandTrack"></div>

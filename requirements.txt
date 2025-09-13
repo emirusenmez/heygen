@@ -9,3 +9,4 @@ Pillow>=9.0.0  # PIL için
 # macOS için ek bağımlılıklar
 pyobjc-framework-AVFoundation>=9.0  # macOS kamera erişimi için
 pyobjc-framework-CoreMedia>=9.0     # macOS medya işleme için
+msal>=1.28.0  # Microsoft Graph için OAuth2
