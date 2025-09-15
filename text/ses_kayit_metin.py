@@ -28,7 +28,8 @@ def ses_kaydet(sure=10):
     try:
         # MacOS'ta 'rec' komutu ile ses kaydet
         # Önce mevcut dizindeki rec'ı dene, sonra sistem rec'ını
-        rec_paths = ['./sox-14.4.2/rec', 'rec']
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        rec_paths = [os.path.join(script_dir, 'sox-14.4.2', 'rec'), 'rec']
         
         for rec_path in rec_paths:
             if os.path.exists(rec_path) or rec_path == 'rec':
@@ -76,14 +77,29 @@ def ses_kaydet_simulasyon(sure=10):
     
     # Geri sayım ve ilerleme göstergesi
     for i in range(sure, 0, -1):
-        print(f"⏱️  Kalan süre: {i} saniye", end='\r')
+        print(f"⏱️  Kalan süre: {i} saniyee", end='\r')
         time.sleep(1)
     
     print(f"\n✅ {sure} saniye simülasyon ses kaydı tamamlandı!")
     
-    # Simüle edilmiş ses dosyası oluştur
-    with open(temp_filename, 'w') as f:
-        f.write("Simulated audio data")
+    # Gerçek WAV dosyası oluştur (sessizlik)
+    import wave
+    import struct
+    
+    # WAV dosyası parametreleri
+    sample_rate = 44100
+    duration = sure
+    num_samples = sample_rate * duration
+    
+    # WAV dosyası oluştur
+    with wave.open(temp_filename, 'w') as wav_file:
+        wav_file.setnchannels(1)  # Mono
+        wav_file.setsampwidth(2)  # 16-bit
+        wav_file.setframerate(sample_rate)
+        
+        # Sessizlik verisi oluştur (sıfır değerler)
+        for _ in range(num_samples):
+            wav_file.writeframes(struct.pack('<h', 0))  # 16-bit little-endian sıfır
     
     return temp_filename
 
@@ -129,7 +145,9 @@ def txt_dosyasina_kaydet(metin):
     
     # Dosya adı oluştur
     dosya_adi = f"ses_kayit_{simdi.strftime('%Y%m%d_%H%M%S')}.txt"
-    dosya_yolu = os.path.join(os.getcwd(), dosya_adi)
+    # Script'in bulunduğu klasöre kaydet (text klasörü)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    dosya_yolu = os.path.join(script_dir, dosya_adi)
     
     # Dosyaya yaz
     with open(dosya_yolu, 'w', encoding='utf-8') as f:

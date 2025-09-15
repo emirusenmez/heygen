@@ -25,6 +25,10 @@ import numpy as np
 import signal
 import sys
 from gif_overlay import load_gif_frames, overlay_gif_on_frame
+try:
+    import speech_recognition as sr  # type: ignore
+except Exception:
+    sr = None  # type: ignore
  
 # Ortam değişkeni yoksa kullanılacak HEYGEN API anahtarı (kullanıcının verdiği)
 HEYGEN_API_KEY_FALLBACK = 'N2Q5OWZiNGM2OWE1NDNlZTkwNzQyMGQ3OWY2Yzc2ZWItMTc1NzQwNDc5Nw=='
@@ -980,6 +984,117 @@ def mux_with_ffmpeg(video_path: str, audio_path: str, output_path: str, audio_te
     return True
 
 
+def transcribe_audio_to_text(wav_path: str, language: str = 'tr-TR') -> str:
+    """WAV dosyasını metne çevirir; speech_recognition yoksa kısa uyarı döner."""
+    if not os.path.exists(wav_path):
+        return ""
+    if sr is None:
+        print("speech_recognition modülü yok, altyazı metni oluşturulamadı")
+        return ""
+    try:
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_path) as source:
+            recognizer.adjust_for_ambient_noise(source, duration=0.2)
+            audio = recognizer.record(source)
+        text = recognizer.recognize_google(audio, language=language)
+        print(f"📝 STT metni: {text[:120]}{'...' if len(text) > 120 else ''}")
+        return text
+    except Exception as e:
+        print(f"STT hata: {e}")
+        return ""
+
+
+def burn_scrolling_text_band(input_mp4: str, output_mp4: str, text: str,
+                             band_height: int = 80, opacity: float = 0.6,
+                             font_size: int = 36, scroll_speed_px_s: int = 180,
+                             font_path: str | None = None, duration_s: int = 20) -> bool:
+    """Altta yarı saydam bant üzerinde sağdan sola kayan metni videoya basar."""
+    ffmpeg = get_ffmpeg_path()
+    if not ffmpeg:
+        return False
+    if not text:
+        # Metin yoksa sadece kopyala
+        cmd = [ffmpeg, '-y', '-i', input_mp4, '-c', 'copy', output_mp4]
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return proc.returncode == 0
+
+    # Geçici metin dosyası (ASCII yol kullan; /tmp)
+    try:
+        tmp_txt = os.path.join('/tmp', f"scroll_text_{uuid.uuid4().hex}.txt")
+        with open(tmp_txt, 'w', encoding='utf-8') as f:
+            f.write(text.replace('\n', ' '))
+    except Exception as e:
+        print(f"Metin dosyası yazılamadı: {e}")
+        return False
+
+    # Opaklık: drawbox alpha 0..1; bant konumu: alt kısım
+    # Scroll ifadesi: x = w - mod(t*speed\, text_w + w)
+    # text_w için tahmini genişlik yerine drawtext'in internal ölçümü kullanmak için uzun döngü gerektirir; pratikte büyük bir döngü ile mod yapılır.
+    # Font: macOS yaygın yolları sırayla dene; path'i drawtext için kaçır
+    def _escape_for_drawtext_path(p: str) -> str:
+        # ffmpeg drawtext için basit kaçışlar
+        return p.replace('\\', r'\\').replace(':', r'\:').replace("'", r"\'").replace(',', r'\,').replace('=', r'\=').replace(' ', r'\ ')
+
+    fontopt = []
+    candidate_paths = []
+    if font_path:
+        candidate_paths.append(font_path)
+    # macOS common
+    candidate_paths += [
+        '/System/Library/Fonts/Supplemental/Arial.ttf',
+        '/Library/Fonts/Arial.ttf',
+        '/System/Library/Fonts/Supplemental/Helvetica.ttf',
+        '/Library/Fonts/Helvetica.ttf',
+        '/System/Library/Fonts/Supplemental/Arial Unicode.ttf',
+    ]
+    chosen_font = None
+    for p in candidate_paths:
+        if p and os.path.exists(p):
+            chosen_font = p
+            break
+    if chosen_font:
+        fontopt = [':fontfile=' + _escape_for_drawtext_path(chosen_font)]
+        print(f"drawtext fontfile kullanılıyor: {chosen_font}")
+    else:
+        print("drawtext için özel font bulunamadı; sistem varsayılanını deneyecek (fontconfig gerekebilir)")
+
+    vf = (
+        f"drawbox=x=0:y=h-{band_height}:w=w:h={band_height}:color=black@{opacity}:t=fill,"
+        f"drawtext=textfile='{tmp_txt}':fontcolor=white:fontsize={font_size}"
+        + (''.join(fontopt)) +
+        f":x=w-mod(t*{scroll_speed_px_s}\,w+tw):y=h-{band_height}/2-(th/2)"
+    )
+
+    cmd = [
+        ffmpeg, '-y',
+        '-i', input_mp4,
+        '-vf', vf,
+        '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p',
+        '-vsync', 'cfr', '-r', '30',
+        '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '1',
+        '-movflags', '+faststart',
+        output_mp4
+    ]
+    print('FFmpeg (scroll band) komutu:', ' '.join(cmd))
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if proc.returncode != 0:
+        try:
+            print(proc.stderr.decode('utf-8', errors='ignore')[:2000])
+        except Exception:
+            pass
+        try:
+            if os.path.exists(tmp_txt):
+                os.remove(tmp_txt)
+        except Exception:
+            pass
+        return False
+    try:
+        if os.path.exists(tmp_txt):
+            os.remove(tmp_txt)
+    except Exception:
+        pass
+    return True
+
 def ses_kaydet(sure, dosya_adi, device_index=None):
     """Rode mikrofon ile kaliteli ses kaydı yapar - cızırtı önleyici ayarlar"""
     try:
@@ -1245,16 +1360,48 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             else:
                 print(f"⏱️  Gerçek süre: {actual_duration:.2f}s, Hedef: {duration_sec}s, atempo uygulanmayacak")
             
-            if mux_with_ffmpeg(video_file, audio_file, output_path, tempo_factor):
-                # Geçici dosyaları sil
+            # 7a. Önce mux -> muxed_path
+            muxed_path = output_path
+            if mux_with_ffmpeg(video_file, audio_file, muxed_path, tempo_factor):
+                # 7b. STT: WAV silmeden önce metni çıkar
                 try:
-                    os.remove(video_file)
-                    os.remove(audio_file)
+                    stt_text = ""
+                    if os.path.exists(audio_file):
+                        stt_text = transcribe_audio_to_text(audio_file)
+                    elif os.path.exists(muxed_path.replace('.mp4', '.wav')):
+                        stt_text = transcribe_audio_to_text(muxed_path.replace('.mp4', '.wav'))
+                except Exception:
+                    stt_text = ""
+
+                # Geçici dosyaları sil (video_file her durumda silinir, audio_file STT sonrası silinir)
+                try:
+                    if os.path.exists(video_file):
+                        os.remove(video_file)
+                    if os.path.exists(audio_file):
+                        os.remove(audio_file)
                     print("🧹 Geçici dosyalar temizlendi")
                 except Exception as e:
                     print(f"⚠️ Geçici dosya temizleme hatası: {e}")
-                
-                print(f"✅ Kayıt tamamlandı: {output_path}")
+
+                # Kayan bant sadece metin varsa basılır
+                if stt_text:
+                    banded_path = os.path.splitext(muxed_path)[0] + '.band.mp4'
+                    font_candidate = '/Library/Fonts/Arial.ttf'
+                    ok_band = burn_scrolling_text_band(
+                        muxed_path, banded_path, stt_text,
+                        band_height=80, opacity=0.6, font_size=36,
+                        scroll_speed_px_s=180, font_path=font_candidate if os.path.exists(font_candidate) else None,
+                        duration_s=duration_sec
+                    )
+                    if ok_band:
+                        try:
+                            os.replace(banded_path, muxed_path)
+                        except Exception as rep_err:
+                            print(f"Bantlı videoyu yerine koyma hatası: {rep_err}")
+                    else:
+                        print("Kayan bant eklenemedi, orijinal mux dosyası kullanılacak.")
+
+                print(f"✅ Kayıt tamamlandı: {muxed_path}")
                 return True
             else:
                 print("❌ Video-ses birleştirme başarısız")
