@@ -54,6 +54,16 @@ FLIGRAM_POSITION = (2, 2)  # (2,2) = merkez
 FLIGRAM_ALPHA = 0.3  # Şeffaflık (0.3 = %30 opak - watermark için)
 FLIGRAM_ENABLED = False  # Fligram overlay'i aktif
 
+# Alt metin overlay ayarları
+BOTTOM_TEXT_ENABLED = True  # Alt metin overlay'i aktif/pasif
+BOTTOM_TEXT = "Havacılık, Uzay ve Teknoloji alanında dünyanın en büyük festivali TEKNOFEST'ten herkese merhaba. Burada milli teknoloji hamlemizin gurur verici projelerini yakından inceleme fırsatı buldum. Tüm katılımcılara sevgiler."
+BOTTOM_TEXT_POSITION = (100, 1000)  # (x, y) - tam ekran için alt kısımda
+BOTTOM_TEXT_FONT = cv2.FONT_HERSHEY_SIMPLEX
+BOTTOM_TEXT_FONT_SCALE = 0.8  # Web arayüzü için uygun boyut
+BOTTOM_TEXT_COLOR = (255, 255, 255)  # Beyaz
+BOTTOM_TEXT_THICKNESS = 2  # Web arayüzü için uygun kalınlık
+BOTTOM_TEXT_LINE_SPACING = 25  # Web arayüzü için uygun satır aralığı
+
 
 app = Flask(__name__)
 
@@ -528,6 +538,60 @@ def add_fligram_to_frame(frame):
     else:
         return frame
 
+def add_bottom_text_to_frame(frame):
+    """Frame'e alt metin ekle - çok satırlı metin desteği ile (web arayüzü için optimize edilmiş)"""
+    global BOTTOM_TEXT_ENABLED, BOTTOM_TEXT, BOTTOM_TEXT_FONT, BOTTOM_TEXT_FONT_SCALE, BOTTOM_TEXT_COLOR, BOTTOM_TEXT_THICKNESS, BOTTOM_TEXT_LINE_SPACING
+    
+    # Alt metin devre dışıysa frame'i olduğu gibi döndür
+    if not BOTTOM_TEXT_ENABLED:
+        return frame
+    
+    # Frame boyutlarını al
+    frame_height, frame_width = frame.shape[:2]
+    
+    # Web arayüzü için dinamik pozisyonlama (640x480 kamera görüntüsü)
+    # Alt kısımda, ortalanmış pozisyon
+    x = 10  # Sol kenardan 10 piksel
+    y = frame_height - 20  # Alt kenardan 20 piksel yukarı
+    
+    # Metni satırlara böl (uzun metinleri otomatik kır)
+    words = BOTTOM_TEXT.split()
+    lines = []
+    current_line = ""
+    
+    for word in words:
+        test_line = current_line + (" " if current_line else "") + word
+        # Metin genişliğini tahmin et
+        (text_width, _), _ = cv2.getTextSize(test_line, BOTTOM_TEXT_FONT, BOTTOM_TEXT_FONT_SCALE, BOTTOM_TEXT_THICKNESS)
+        
+        # Frame genişliğinin %95'ini aşarsa yeni satıra geç (web arayüzü için)
+        if text_width > frame_width * 0.95:
+            if current_line:
+                lines.append(current_line)
+                current_line = word
+            else:
+                lines.append(word)
+        else:
+            current_line = test_line
+    
+    if current_line:
+        lines.append(current_line)
+    
+    # Metni frame'e yaz (alt kısımdan yukarı doğru)
+    for i, line in enumerate(lines):
+        line_y = y - (i * BOTTOM_TEXT_LINE_SPACING)
+        
+        # Metin gölgesi ekle (daha iyi okunabilirlik için)
+        shadow_offset = 1
+        cv2.putText(frame, line, (x + shadow_offset, line_y + shadow_offset), 
+                   BOTTOM_TEXT_FONT, BOTTOM_TEXT_FONT_SCALE, (0, 0, 0), BOTTOM_TEXT_THICKNESS + 1)
+        
+        # Ana metni yaz
+        cv2.putText(frame, line, (x, line_y), 
+                   BOTTOM_TEXT_FONT, BOTTOM_TEXT_FONT_SCALE, BOTTOM_TEXT_COLOR, BOTTOM_TEXT_THICKNESS)
+    
+    return frame
+
 def add_gif_to_frame(frame, frame_index: int, fps: float = 30.0):
     """Frame'e GIF overlay ekle - hız kontrolü ile"""
     global GIF_FRAMES
@@ -893,6 +957,9 @@ def show_fullscreen_camera():
             cv2.putText(black_frame, "Kayit devam ediyor...", 
                        (50, screen_height - 50), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (255, 255, 255), 3)
             
+            # Alt metin ekle (sadece tam ekran kamera penceresinde)
+            black_frame = add_bottom_text_to_frame(black_frame)
+            
             cv2.imshow(window_name, black_frame)
             
             # 'q' tuşu ile çıkış
@@ -1005,6 +1072,7 @@ def generate_frames():
             ret, frame = PREVIEW_CAMERA.read()
             if not ret:
                 break
+            
             
             # Frame'i JPEG'e çevir
             ret, buffer = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 80])
