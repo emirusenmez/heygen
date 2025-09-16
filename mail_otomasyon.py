@@ -14,7 +14,7 @@ SMTP_PORT = 587  # Alternatif: 25, 465 (SSL)
 
 sender = "dijitalyayinlar@demirorenmedya.com"  # Gerçek Exchange Online email adresinizi yazın
 password = "TGG351tg@@**"  # Uygulama parolası kullanın (16 karakterlik kod)
-receiver = "ntopcugil@hurriyet.com.tr"  # Gerçek alıcı email adresini yazın
+receiver = "emir.usenmez@hurriyet.com.tr"  # Gerçek alıcı email adresini yazın
 
 def encode_image_to_base64(image_path):
     """Resmi Base64 formatına çevirir"""

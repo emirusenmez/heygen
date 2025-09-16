@@ -34,14 +34,14 @@ except Exception:
 HEYGEN_API_KEY_FALLBACK = 'N2Q5OWZiNGM2OWE1NDNlZTkwNzQyMGQ3OWY2Yzc2ZWItMTc1NzQwNDc5Nw=='
 #api key:  N2Q5OWZiNGM2OWE1NDNlZTkwNzQyMGQ3OWY2Yzc2ZWItMTc1NzQwNDc5Nw==
 
-TRANSLATED_OUTPUT_DIR = r'/Users/emirefeusenmez/Library/CloudStorage/OneDrive-DemirörenTeknoloji-Hürriyet/videos'
+TRANSLATED_OUTPUT_DIR = r'/Users/emirefeusenmez/Library/CloudStorage/OneDrive-DemirörenTeknoloji-Hürriyet/Masaüstü/videos'
 
 # Ham videoların kaydedileceği klasör (OneDrive)
 RAW_OUTPUT_DIR = r'/Users/emirefeusenmez/Library/CloudStorage/OneDrive-DemirörenTeknoloji-Hürriyet/Masaüstü/tr'
 
 # GIF overlay ayarları
 GIF_PATH = '/Users/emirefeusenmez/code/heygen/gif.gif'
-GIF_SIZE = (200, 200)  # 200x200 piksel
+GIF_SIZE = (100, 100)  # 200x200 piksel
 GIF_POSITION = (0, 0)  # (0,0) = sağ üst köşe
 GIF_ALPHA = 1.0  # Şeffaflık (1.0 = tam opak)
 GIF_DURATION = 20.0  # GIF'in bir turu kaç saniyede tamamlanacak
@@ -52,7 +52,7 @@ FLIGRAM_PATH = '/Users/emirefeusenmez/code/heygen/fligram.png'
 FLIGRAM_SIZE = None  # Video boyutuna göre dinamik olarak hesaplanacak
 FLIGRAM_POSITION = (2, 2)  # (2,2) = merkez
 FLIGRAM_ALPHA = 0.3  # Şeffaflık (0.3 = %30 opak - watermark için)
-FLIGRAM_ENABLED = True  # Fligram overlay'i aktif
+FLIGRAM_ENABLED = False  # Fligram overlay'i aktif
 
 
 app = Flask(__name__)
@@ -66,6 +66,7 @@ FULLSCREEN_THREAD = None
 _fullscreen_thread = None  # Thread referansı için
 PREVIEW_STOP_EVENT = threading.Event()
 FULLSCREEN_STOP_EVENT = threading.Event()
+RECORDING_DURATION = 20  # Video kayıt süresi (saniye)
 
 
 def ensure_output_dir(path: str) -> None:
@@ -88,11 +89,80 @@ def _send_email_smtp(recipient_email: str, subject: str, html_body: str, attachm
         smtp_port = int(os.getenv('SMTP_PORT', '587'))
     except Exception:
         smtp_port = 587
-    smtp_user = os.getenv('SMTP_USER') or os.getenv('SMTP_USERNAME')
-    smtp_pass = os.getenv('SMTP_PASSWORD') or os.getenv('SMTP_PASS')
+    smtp_user = os.getenv('SMTP_USER') or os.getenv('SMTP_USERNAME') or "dijitalyayinlar@demirorenmedya.com"
+    smtp_pass = os.getenv('SMTP_PASSWORD') or os.getenv('SMTP_PASS') or "TGG351tg@@**"
 
     if not smtp_user or not smtp_pass:
         print('SMTP kimlik bilgileri bulunamadı (SMTP_USER/SMTP_PASSWORD). E-posta atlanıyor.')
+        return False
+
+    try:
+        # Email mesajını oluştur (mail_otomasyon.py'den alınan format)
+        msg = MIMEMultipart('related')
+        msg['From'] = smtp_user
+        msg['To'] = recipient_email
+        msg['Subject'] = subject
+        
+        # Body tipini belirle
+        alternative = MIMEMultipart('alternative')
+        alternative.attach(MIMEText(html_body, 'html'))
+        msg.attach(alternative)
+
+        # Video dosyasını ekle (ek/attachment olarak)
+        if attachment_path and os.path.exists(attachment_path):
+            try:
+                with open(attachment_path, 'rb') as vf:
+                    video_part = MIMEBase('video', 'mp4')
+                    video_part.set_payload(vf.read())
+                encoders.encode_base64(video_part)
+                # Ek dosya adı: dosya adındaki kişi ismi (webcam_<isim>_... -> <isim>.mp4)
+                base_name = os.path.basename(attachment_path)
+                name_root, ext = os.path.splitext(base_name)
+                parts = name_root.split('_')
+                person_name = parts[1] if len(parts) >= 2 else name_root
+                attach_name = f"{person_name}{ext or '.mp4'}"
+                video_part.add_header('Content-Disposition', 'attachment', filename=attach_name)
+                msg.attach(video_part)
+            except FileNotFoundError:
+                print(f"Video bulunamadı: {attachment_path}")
+        
+        # SSL context oluştur (certifi ile güvenilir kökler)
+        context = ssl.create_default_context()
+        try:
+            context.load_verify_locations(cafile=certifi.where())
+        except Exception:
+            pass
+        
+        # SMTP bağlantısı kur
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.ehlo()  # Sunucuya kendimizi tanıt
+            server.starttls(context=context)  # TLS şifreleme başlat
+            server.ehlo()  # TLS sonrası tekrar tanıt
+            server.login(smtp_user, smtp_pass)  # Giriş yap
+            
+            # Email gönder
+            text = msg.as_string()
+            server.sendmail(smtp_user, [recipient_email], text)
+            
+        print(f"Email başarıyla gönderildi: {recipient_email}")
+        return True
+        
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"SMTP kimlik doğrulama hatası: {str(e)}")
+        print("Lütfen email adresinizi ve şifrenizi kontrol edin.")
+        print("Exchange Online için uygulama parolası kullanmanız gerekebilir.")
+        return False
+        
+    except smtplib.SMTPRecipientsRefused as e:
+        print(f"Alıcı reddedildi: {str(e)}")
+        return False
+        
+    except smtplib.SMTPServerDisconnected as e:
+        print(f"SMTP sunucu bağlantısı kesildi: {str(e)}")
+        return False
+        
+    except Exception as e:
+        print(f"Beklenmeyen hata: {str(e)}")
         return False
 
 
@@ -148,39 +218,6 @@ def _send_email_graph(recipient_email: str, subject: str, html_body: str, attach
         print(f"Graph gönderim hatası: {e}")
         return False
 
-    try:
-        msg = MIMEMultipart()
-        msg['From'] = smtp_user
-        msg['To'] = recipient_email
-        msg['Subject'] = subject
-        msg.attach(MIMEText(html_body, 'html'))
-
-        if attachment_path and os.path.exists(attachment_path):
-            try:
-                with open(attachment_path, 'rb') as f:
-                    part = MIMEBase('application', 'octet-stream')
-                    part.set_payload(f.read())
-                encoders.encode_base64(part)
-                part.add_header('Content-Disposition', f'attachment; filename="{os.path.basename(attachment_path)}"')
-                msg.attach(part)
-            except Exception as attach_err:
-                print(f'E-posta eki eklenemedi: {attach_err}')
-
-        context = ssl.create_default_context(cafile=certifi.where())
-        with smtplib.SMTP(smtp_host, smtp_port) as server:
-            server.ehlo()
-            server.starttls(context=context)
-            server.ehlo()
-            server.login(smtp_user, smtp_pass)
-            server.sendmail(smtp_user, [recipient_email], msg.as_string())
-        print(f"E-posta gönderildi: {recipient_email}")
-        return True
-    except smtplib.SMTPAuthenticationError as e:
-        print(f"SMTP auth hatası: {e}")
-        return False
-    except Exception as e:
-        print(f"E-posta gönderim hatası: {e}")
-        return False
 
 
 # ------- Mail HTML yardımcıları (logo ve gövde oluşturma) -------
@@ -202,62 +239,78 @@ def _build_branded_email_body(default_body: str) -> str:
     insta_logo = _encode_image_to_base64(insta_path)
     x_logo = _encode_image_to_base64(x_path)
 
-    n_sosyal_img = (
-        f'<img src="data:image/png;base64,{n_sosyal_logo}" alt="N Sosyal" style="width:24px;height:24px;margin-right:10px;">'
-        if n_sosyal_logo else '<span style="font-size:24px;margin-right:10px;">📱</span>'
-    )
-    instagram_img = (
-        f'<img src="data:image/png;base64,{insta_logo}" alt="Instagram" style="width:24px;height:24px;margin-right:10px;">'
-        if insta_logo else '<span style="font-size:24px;margin-right:10px;">📷</span>'
-    )
-    x_img = (
-        f'<img src="data:image/png;base64,{x_logo}" alt="X" style="width:24px;height:24px;margin-right:10px;">'
-        if x_logo else '<span style="font-size:24px;margin-right:10px;">🐦</span>'
-    )
+    # Logo HTML'lerini oluştur - mail_otomasyon.py ile aynı format
+    if n_sosyal_logo:
+        n_sosyal_img = f'<img src="data:image/png;base64,{n_sosyal_logo}" alt="N Sosyal" style="width: 24px; height: 24px; margin-right: 10px;">'
+    else:
+        n_sosyal_img = '<span style="font-size: 24px; margin-right: 10px;">📱</span>'  # Emoji alternatif
 
-    # Varsayılan bilgi metnini üstte tut, altına link bölümlerini ekle
-    return (
-        f"<div style=\"margin:0;padding:0;background-color:#ffffff;\">"
-        f"  <div style=\"max-width:560px;margin:0 auto;padding:16px;"
-        f"              font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#111;\">"
-        f"    {default_body}"
-        f"    <div style=\"display:flex;align-items:center;gap:8px;margin:16px 0 8px;\">{n_sosyal_img}<span style=\"font-weight:700;font-size:16px;\">N Sosyal</span></div>"
-        f"    <div style=\"font-size:14px;line-height:1.5;color:#111;\">"
-        f"      <a href=\"https://sosyal.teknofest.app/@hurriyet\" style=\"color:#111;\">Hürriyet</a> | "
-        f"      <a href=\"https://sosyal.teknofest.app/@milliyet\" style=\"color:#111;\">Milliyet</a> | "
-        f"      <a href=\"https://sosyal.teknofest.app/@cnnturkcom\" style=\"color:#111;\">CNN Türk</a> | "
-        f"      <a href=\"https://sosyal.teknofest.app/@fanatikcomtr\" style=\"color:#111;\">Fanatik</a> | "
-        f"      <a href=\"https://sosyal.teknofest.app/@postacomtr\" style=\"color:#111;\">Posta</a> | "
-        f"      <a href=\"https://sosyal.teknofest.app/@gazetevatan\" style=\"color:#111;\">Vatan</a> | "
-        f"      <a href=\"https://sosyal.teknofest.app/@kanald\" style=\"color:#111;\">Kanal D</a> | "
-        f"      <a href=\"https://sosyal.teknofest.app/@teve2\" style=\"color:#111;\">Teve2</a>"
-        f"    </div>"
-        f"    <div style=\"display:flex;align-items:center;gap:8px;margin:16px 0 8px;\">{instagram_img}<span style=\"font-weight:700;font-size:16px;\">Instagram</span></div>"
-        f"    <div style=\"font-size:14px;line-height:1.5;color:#111;\">"
-        f"      <a href=\"https://www.instagram.com/hurriyetcomtr/\" style=\"color:#111;\">Hürriyet</a> | "
-        f"      <a href=\"https://www.instagram.com/milliyetcomtr/\" style=\"color:#111;\">Milliyet</a> | "
-        f"      <a href=\"https://www.instagram.com/cnnturk/\" style=\"color:#111;\">CNN Türk</a> | "
-        f"      <a href=\"https://www.instagram.com/fanatikcomtr/\" style=\"color:#111;\">Fanatik</a> | "
-        f"      <a href=\"https://www.instagram.com/posta.com.tr/\" style=\"color:#111;\">Posta</a> | "
-        f"      <a href=\"https://www.instagram.com/gazetevatancom/\" style=\"color:#111;\">Vatan</a> | "
-        f"      <a href=\"https://www.instagram.com/kanald/\" style=\"color:#111;\">Kanal D</a> | "
-        f"      <a href=\"https://www.instagram.com/teve2/\" style=\"color:#111;\">Teve2</a>"
-        f"    </div>"
-        f"    <div style=\"display:flex;align-items:center;gap:8px;margin:16px 0 8px;\">{x_img}<span style=\"font-weight:700;font-size:16px;\">X</span></div>"
-        f"    <div style=\"font-size:14px;line-height:1.5;color:#111;\">"
-        f"      <a href=\"https://x.com/Hurriyet\" style=\"color:#111;\">Hürriyet</a> | "
-        f"      <a href=\"https://x.com/milliyet\" style=\"color:#111;\">Milliyet</a> | "
-        f"      <a href=\"https://x.com/cnnturk\" style=\"color:#111;\">CNN Türk</a> | "
-        f"      <a href=\"https://x.com/fanatikcomtr\" style=\"color:#111;\">Fanatik</a> | "
-        f"      <a href=\"https://x.com/postacomtr\" style=\"color:#111;\">Posta</a> | "
-        f"      <a href=\"https://x.com/Vatan\" style=\"color:#111;\">Vatan</a> | "
-        f"      <a href=\"https://x.com/kanald\" style=\"color:#111;\">Kanal D</a> | "
-        f"      <a href=\"https://x.com/teve2Official\" style=\"color:#111;\">Teve2</a>"
-        f"    </div>"
-        f"    <p style=\"font-size:14px;line-height:1.5;margin:16px 0;color:#333;\">Sevgiler,<br/>Demirören Medya Dijital Yayınlar</p>"
-        f"  </div>"
-        f"</div>"
-    )
+    if insta_logo:
+        instagram_img = f'<img src="data:image/png;base64,{insta_logo}" alt="Instagram" style="width: 24px; height: 24px; margin-right: 10px;">'
+    else:
+        instagram_img = '<span style="font-size: 24px; margin-right: 10px;">📷</span>'  # Emoji alternatif
+
+    if x_logo:
+        x_img = f'<img src="data:image/png;base64,{x_logo}" alt="X" style="width: 24px; height: 24px; margin-right: 10px;">'
+    else:
+        x_img = '<span style="font-size: 24px; margin-right: 10px;">🐦</span>'  # Emoji alternatif
+
+    # mail_otomasyon.py ile aynı format
+    return f"""
+    <div style="margin:0; padding:0; background-color:#ffffff;"> 
+      <div style="max-width:560px; margin:0 auto; padding:16px; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#111;"> 
+        {default_body}
+        
+
+        <div style="display:flex; align-items:center; gap:8px; margin:16px 0 8px;"> 
+          {n_sosyal_img} 
+          <span style="font-weight:700; font-size:16px;">N Sosyal</span> 
+        </div> 
+        <div style="font-size:14px; line-height:1.5; color:#111;"> 
+          <a href="https://sosyal.teknofest.app/@hurriyet" style="color:#111;">Hürriyet</a> | 
+          <a href="https://sosyal.teknofest.app/@milliyet" style="color:#111;">Milliyet</a> | 
+          <a href="https://sosyal.teknofest.app/@cnnturkcom" style="color:#111;">CNN Türk</a> | 
+          <a href="https://sosyal.teknofest.app/@fanatikcomtr" style="color:#111;">Fanatik</a> | 
+          <a href="https://sosyal.teknofest.app/@postacomtr" style="color:#111;">Posta</a> | 
+          <a href="https://sosyal.teknofest.app/@gazetevatan" style="color:#111;">Vatan</a> | 
+          <a href="https://sosyal.teknofest.app/@kanald" style="color:#111;">Kanal D</a> | 
+          <a href="https://sosyal.teknofest.app/@teve2" style="color:#111;">Teve2</a> 
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; margin:16px 0 8px;"> 
+          {instagram_img} 
+          <span style="font-weight:700; font-size:16px;">Instagram</span> 
+        </div> 
+        <div style="font-size:14px; line-height:1.5; color:#111;"> 
+          <a href="https://www.instagram.com/hurriyetcomtr/" style="color:#111;">Hürriyet</a> | 
+          <a href="https://www.instagram.com/milliyetcomtr/" style="color:#111;">Milliyet</a> | 
+          <a href="https://www.instagram.com/cnnturk/" style="color:#111;">CNN Türk</a> | 
+          <a href="https://www.instagram.com/fanatikcomtr/" style="color:#111;">Fanatik</a> | 
+          <a href="https://www.instagram.com/posta.com.tr/" style="color:#111;">Posta</a> | 
+          <a href="https://www.instagram.com/gazetevatancom/" style="color:#111;">Vatan</a> | 
+          <a href="https://www.instagram.com/kanald/" style="color:#111;">Kanal D</a> | 
+          <a href="https://www.instagram.com/teve2/" style="color:#111;">Teve2</a> 
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px; margin:16px 0 8px;"> 
+          {x_img} 
+          <span style="font-weight:700; font-size:16px;">X</span> 
+        </div> 
+        <div style="font-size:14px; line-height:1.5; color:#111;"> 
+          <a href="https://x.com/Hurriyet" style="color:#111;">Hürriyet</a> | 
+          <a href="https://x.com/milliyet" style="color:#111;">Milliyet</a> | 
+          <a href="https://x.com/cnnturk" style="color:#111;">CNN Türk</a> | 
+          <a href="https://x.com/fanatikcomtr" style="color:#111;">Fanatik</a> | 
+          <a href="https://x.com/postacomtr" style="color:#111;">Posta</a> | 
+          <a href="https://x.com/Vatan" style="color:#111;">Vatan</a> | 
+          <a href="https://x.com/kanald" style="color:#111;">Kanal D</a> | 
+          <a href="https://x.com/teve2Official" style="color:#111;">Teve2</a> 
+        </div>
+
+        <p style="font-size:14px; line-height:1.5; margin:16px 0; color:#333;">Sevgiler,<br/>Demirören Medya Dijital Yayınlar</p> 
+      </div> 
+    </div> 
+    """
 
 
 def _derive_attachment_name(video_path: str) -> str:
@@ -800,6 +853,12 @@ def show_fullscreen_camera():
         while not FULLSCREEN_STOP_EVENT.is_set():
             if FULLSCREEN_CAMERA is None:
                 break
+            
+            # Kayıt süresi dolduysa otomatik olarak çık
+            elapsed = time.time() - start_time
+            if elapsed >= RECORDING_DURATION:
+                print(f"📹 Tam ekran kamera {RECORDING_DURATION}s süre doldu, kapatılıyor...")
+                break
                 
             ret, frame = FULLSCREEN_CAMERA.read()
             if not ret:
@@ -824,10 +883,10 @@ def show_fullscreen_camera():
             
             # Süre bilgisini ekle
             elapsed = int(time.time() - start_time)
-            remaining = max(0, 20 - elapsed)  # 20 saniye kayıt
+            remaining = max(0, RECORDING_DURATION - elapsed)  # Gerçek kayıt süresi
             
             # Metin ekle
-            cv2.putText(black_frame, f"Kayit: {elapsed:02d}s / 20s", 
+            cv2.putText(black_frame, f"Kayit: {elapsed:02d}s / {RECORDING_DURATION}s", 
                        (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4)
             cv2.putText(black_frame, f"Kalan: {remaining:02d}s", 
                        (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 4)
@@ -843,7 +902,16 @@ def show_fullscreen_camera():
     except Exception as e:
         print(f"Tam ekran kamera hatası: {e}")
     finally:
-        cv2.destroyAllWindows()
+        # Pencereyi zorla kapat
+        try:
+            cv2.destroyWindow(window_name)
+            cv2.destroyAllWindows()
+            print("📹 Tam ekran pencere zorla kapatıldı")
+        except Exception as e:
+            print(f"Pencere kapatma hatası: {e}")
+        
+        # Kısa bekleme
+        time.sleep(0.1)
 
 
 def stop_camera_preview():
@@ -870,37 +938,52 @@ def stop_fullscreen_camera():
     """Tam ekran kamera penceresini durdur"""
     global FULLSCREEN_CAMERA, FULLSCREEN_THREAD, FULLSCREEN_STOP_EVENT, _fullscreen_thread
     
+    # Eğer zaten durdurulmuşsa tekrar durdurma
+    if FULLSCREEN_CAMERA is None and FULLSCREEN_THREAD is None and _fullscreen_thread is None:
+        return
+    
+    print("📹 Tam ekran kamera penceresi kapatılıyor...")
+    
+    # Stop event'i set et
     FULLSCREEN_STOP_EVENT.set()
     
+    # Kamera'yı kapat
     if FULLSCREEN_CAMERA is not None:
         try:
             FULLSCREEN_CAMERA.release()
+            print("📹 Kamera release edildi")
         except Exception as e:
             print(f"Tam ekran kamera release hatası: {e}")
         finally:
             FULLSCREEN_CAMERA = None
     
+    # Tüm OpenCV pencerelerini hemen kapat
+    try:
+        cv2.destroyAllWindows()
+        print("📹 OpenCV pencereleri kapatıldı")
+    except Exception as e:
+        print(f"OpenCV pencere kapatma hatası: {e}")
+    
     # Thread'leri temizle
-    for thread in [FULLSCREEN_THREAD, _fullscreen_thread]:
-        if thread is not None:
+    threads_to_clean = [FULLSCREEN_THREAD, _fullscreen_thread]
+    for thread in threads_to_clean:
+        if thread is not None and thread.is_alive():
             try:
-                thread.join(timeout=2)
+                print(f"📹 Thread bekleniyor: {thread.name}")
+                thread.join(timeout=1)  # 1 saniye bekle
+                if thread.is_alive():
+                    print(f"⚠️ Thread hala çalışıyor, zorla sonlandırılıyor")
             except Exception as e:
                 print(f"Thread join hatası: {e}")
     
+    # Thread referanslarını temizle
     FULLSCREEN_THREAD = None
     _fullscreen_thread = None
-    
-    # Tüm OpenCV pencerelerini kapat
-    try:
-        cv2.destroyAllWindows()
-    except Exception as e:
-        print(f"OpenCV pencere kapatma hatası: {e}")
     
     # Kısa bekleme - kamera tamamen serbest bırakılsın
     time.sleep(0.2)
     
-    print("Tam ekran kamera penceresi durduruldu")
+    print("✅ Tam ekran kamera penceresi tamamen durduruldu")
 
 
 def generate_frames():
@@ -962,7 +1045,7 @@ def mux_with_ffmpeg(video_path: str, audio_path: str, output_path: str, audio_te
         '-map', '0:v:0', '-map', '1:a:0',
         # Videoyu CFR 30fps yeniden kodla ve süreyi sabitle
         '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p',
-        '-vsync', 'cfr', '-r', '30',
+        '-fps_mode', 'cfr', '-r', '30',
         # Sesi kodla ve filtreleri uygula
         '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '1',
         '-af', ','.join(afilters),
@@ -1006,7 +1089,7 @@ def transcribe_audio_to_text(wav_path: str, language: str = 'tr-TR') -> str:
 
 def burn_scrolling_text_band(input_mp4: str, output_mp4: str, text: str,
                              band_height: int = 80, opacity: float = 0.6,
-                             font_size: int = 36, scroll_speed_px_s: int = 180,
+                             font_size: int = 36, scroll_speed_px_s: int = 250,
                              font_path: str | None = None, duration_s: int = 20) -> bool:
     """Altta yarı saydam bant üzerinde sağdan sola kayan metni videoya basar."""
     ffmpeg = get_ffmpeg_path()
@@ -1058,11 +1141,12 @@ def burn_scrolling_text_band(input_mp4: str, output_mp4: str, text: str,
     else:
         print("drawtext için özel font bulunamadı; sistem varsayılanını deneyecek (fontconfig gerekebilir)")
 
+    # Alttan kayan metin (siyah band ile) - yazılar bandın içinden kayıyor
     vf = (
-        f"drawbox=x=0:y=h-{band_height}:w=w:h={band_height}:color=black@{opacity}:t=fill,"
+        f"drawbox=x=0:y=640:w=1280:h={band_height}:color=black@{opacity}:t=fill,"
         f"drawtext=textfile='{tmp_txt}':fontcolor=white:fontsize={font_size}"
         + (''.join(fontopt)) +
-        f":x=w-mod(t*{scroll_speed_px_s}\,w+tw):y=h-{band_height}/2-(th/2)"
+        f":x=1280-t*{scroll_speed_px_s}:y=670"
     )
 
     cmd = [
@@ -1070,7 +1154,7 @@ def burn_scrolling_text_band(input_mp4: str, output_mp4: str, text: str,
         '-i', input_mp4,
         '-vf', vf,
         '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-pix_fmt', 'yuv420p',
-        '-vsync', 'cfr', '-r', '30',
+        '-fps_mode', 'cfr', '-r', '30',
         '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '1',
         '-movflags', '+faststart',
         output_mp4
@@ -1303,10 +1387,6 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
         target_frames = duration_sec * 30  # 20 saniye = 600 frame (30 FPS)
         
         while frame_count < target_frames:
-            # Frame sayısına göre kontrol (tam 20 saniye için)
-            if frame_count >= target_frames:
-                print(f"✅ Hedef frame sayısına ulaşıldı: {frame_count}/{target_frames}")
-                break
                 
             # Frame oku
             ret, frame = cap.read()
@@ -1334,15 +1414,33 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
             # İlerleme göster (her saniye)
             if frame_count % 30 == 0:
                 print(f"📹 Kayıt: {elapsed:.1f}s / {duration_sec}s (Kalan: {remaining:.1f}s)")
+            
+            # Frame sayısına ulaştıysa döngüden çık
+            if frame_count >= target_frames:
+                print(f"✅ Hedef frame sayısına ulaşıldı: {frame_count}/{target_frames}")
+                break
         
-        # 5. Video kaydını bitir
+        # 5. Video kaydını bitir - hemen kapat
         try:
             out.release()
-            cap.release()
-            cv2.destroyAllWindows()
             print("✅ Video kaydı tamamlandı")
         except Exception as e:
-            print(f"Kaynak temizleme hatası: {e}")
+            print(f"Video writer kapatma hatası: {e}")
+        
+        # Kamera hemen kapat
+        try:
+            cap.release()
+            cv2.destroyAllWindows()
+            print("📹 Kamera hemen kapatıldı")
+        except Exception as e:
+            print(f"Kamera kapatma hatası: {e}")
+        
+        # Tam ekran kamera penceresini de hemen kapat
+        try:
+            stop_fullscreen_camera()
+            print("📹 Tam ekran kamera penceresi hemen kapatıldı")
+        except Exception as e:
+            print(f"Tam ekran kamera kapatma hatası: {e}")
         
         # 6. Ses kaydının bitmesini bekle
         if with_audio and audio_thread:
@@ -1390,7 +1488,7 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
                     ok_band = burn_scrolling_text_band(
                         muxed_path, banded_path, stt_text,
                         band_height=80, opacity=0.6, font_size=36,
-                        scroll_speed_px_s=180, font_path=font_candidate if os.path.exists(font_candidate) else None,
+                        scroll_speed_px_s=250, font_path=font_candidate if os.path.exists(font_candidate) else None,
                         duration_s=duration_sec
                     )
                     if ok_band:
@@ -2071,27 +2169,39 @@ def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, trans
     last_status = None
     info = {}
     while True:
-        info = _get_status(vt_id, api_key)
-        status = (info.get('status') or '').lower()
-        if status and status != last_status:
-            print(f'Status: {status}')
-            last_status = status
+        try:
+            info = _get_status(vt_id, api_key)
+            status = (info.get('status') or '').lower()
+            if status and status != last_status:
+                print(f'Status: {status}')
+                last_status = status
+                if translation_id:
+                    TRANSLATION_JOBS[translation_id] = {"status": "translating", "message": f"Çeviri durumu: {status}"}
+            
+            if status in ('completed', 'succeeded', 'success', 'done'):
+                break
+            if status in ('failed', 'error'):
+                print(f'İşlem başarısız: {json.dumps(info)[:200]}')
+                if translation_id:
+                    TRANSLATION_JOBS[translation_id] = {"status": "error", "message": f"Çeviri başarısız: {status}"}
+                return
+            if time.time() - start_t > deadline:
+                print('Zaman aşımı')
+                if translation_id:
+                    TRANSLATION_JOBS[translation_id] = {"status": "error", "message": "Çeviri zaman aşımı"}
+                return
+            time.sleep(5)
+            
+        except requests.exceptions.ConnectionError as e:
+            print(f"⚠️ API bağlantı hatası: {e}")
             if translation_id:
-                TRANSLATION_JOBS[translation_id] = {"status": "translating", "message": f"Çeviri durumu: {status}"}
-        
-        if status in ('completed', 'succeeded', 'success', 'done'):
-            break
-        if status in ('failed', 'error'):
-            print(f'İşlem başarısız: {json.dumps(info)[:200]}')
-            if translation_id:
-                TRANSLATION_JOBS[translation_id] = {"status": "error", "message": f"Çeviri başarısız: {status}"}
+                TRANSLATION_JOBS[translation_id] = {"status": "error", "message": f"API bağlantı hatası: {e}"}
             return
-        if time.time() - start_t > deadline:
-            print('Zaman aşımı')
+        except Exception as e:
+            print(f"⚠️ Durum kontrolü hatası: {e}")
             if translation_id:
-                TRANSLATION_JOBS[translation_id] = {"status": "error", "message": "Çeviri zaman aşımı"}
+                TRANSLATION_JOBS[translation_id] = {"status": "error", "message": f"Durum kontrolü hatası: {e}"}
             return
-        time.sleep(5)
 
     download_url = (
         info.get('download_url') or info.get('url') or info.get('video_url') or info.get('output_url')
@@ -2120,22 +2230,82 @@ def translate_with_heygen(video_path: str, safe_name: str, safe_lang: str, trans
             print('📝 Altyazı dosyası indiriliyor...')
             _download_file(caption_url, caption_path)
             print(f'📝 Altyazı dosyası indirildi: {caption_path}')
-        else:
-            print('⚠️ Altyazı dosyası bulunamadı')
     except Exception as e:
-        print(f'⚠️ Altyazı indirme hatası: {e}')
+        pass  # Altyazı hatası sessizce geç
+    
+    # Alt yazı ekleme işlemi (çeviri tamamlandıktan sonra)
+    try:
+        print("🎬 Çevrilen videoya alt yazı ekleniyor...")
+        if translation_id:
+            TRANSLATION_JOBS[translation_id] = {"status": "adding_subtitles", "message": "Alt yazı ekleniyor..."}
+        
+        # Alt yazı eklenmiş video dosyası
+        subtitled_path = os.path.splitext(out_path)[0] + '_subtitled.mp4'
+        
+        # VTT dosyasından metni oku
+        vtt_path = os.path.splitext(out_path)[0] + '.vtt'
+        subtitle_text = ""
+        
+        if os.path.exists(vtt_path):
+            try:
+                with open(vtt_path, 'r', encoding='utf-8') as f:
+                    vtt_content = f.read()
+                    # VTT dosyasından metin çıkar (basit parsing)
+                    lines = vtt_content.split('\n')
+                    subtitle_lines = []
+                    for line in lines:
+                        line = line.strip()
+                        if line and not line.startswith('WEBVTT') and not line.startswith('NOTE') and not '-->' in line and not line.isdigit():
+                            subtitle_lines.append(line)
+                    subtitle_text = ' '.join(subtitle_lines)
+                    print(f"📝 VTT'den çıkarılan metin: {subtitle_text[:100]}...")
+            except Exception as e:
+                pass  # VTT okuma hatası sessizce geç
+        
+        # Alt yazı ekleme işlemi
+        if subtitle_text:
+            font_candidate = '/Library/Fonts/Arial.ttf'
+            ok_subtitle = burn_scrolling_text_band(
+                out_path, subtitled_path, subtitle_text,
+                band_height=80, opacity=0.6, font_size=36,
+                scroll_speed_px_s=180, font_path=font_candidate if os.path.exists(font_candidate) else None,
+                duration_s=20  # Varsayılan süre
+            )
+            
+            if ok_subtitle:
+                # Orijinal dosyayı yedekle ve alt yazılı versiyonu kullan
+                try:
+                    backup_path = os.path.splitext(out_path)[0] + '_original.mp4'
+                    os.rename(out_path, backup_path)
+                    os.rename(subtitled_path, out_path)
+                    print(f"✅ Alt yazı başarıyla eklendi: {out_path}")
+                    print(f"📁 Orijinal video yedeklendi: {backup_path}")
+                except Exception as e:
+                    print(f"⚠️ Dosya değiştirme hatası: {e}")
+            else:
+                pass  # Alt yazı eklenemedi, sessizce geç
+                try:
+                    if os.path.exists(subtitled_path):
+                        os.remove(subtitled_path)
+                except Exception:
+                    pass
+        else:
+            pass  # Alt yazı metni bulunamadı, sessizce geç
+    
+    except Exception as e:
+        pass  # Alt yazı ekleme hatası sessizce geç
     
     if translation_id:
-        TRANSLATION_JOBS[translation_id] = {"status": "completed", "message": "Çeviri ve altyazı tamamlandı", "output_path": out_path}
+        TRANSLATION_JOBS[translation_id] = {"status": "completed", "message": "Çeviri ve alt yazı tamamlandı", "output_path": out_path}
 
     # Çıktıyı e-posta ile gönder (opsiyonel)
     try:
         if recipient_email and '@' in recipient_email:
-            subject = f"🎉 Videonuz Hazır: {safe_name}_{safe_lang}.mp4"
+            subject = f"🎉 Teknofest 2025'teki Videonuz Hazır!"
             base_body = (
-                f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Merhaba,</p>"
-                f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Videonuz hazırlandı.</p>"
-                f"<p style=\"font-size:14px;color:#555;margin:0 0 16px;\">Dosya adı: <b>{os.path.basename(out_path)}</b></p>"
+                f"<p style=\"font-size:16px; line-height:1.5; margin:0 0 12px;\">Merhaba,</p>"
+                f"<p style=\"font-size:16px; line-height:1.5; margin:0 0 12px;\">Teknofest 2025 (17-21 Eylül) etkinliğinde Demirören Medya dijital standında çekilen videonuz ektedir.</p>"
+                f"<p style=\"font-size:14px; color:#555; margin:0 0 16px;\">Dosya adı: <b>{os.path.basename(out_path)}</b></p>"
             )
             html_body = _build_branded_email_body(base_body)
             # Önce Graph ile linkli gönder, sonra ek olarak düş
@@ -2192,9 +2362,9 @@ def api_send_email():
 
     try:
         base_body = (
-            f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Merhaba,</p>"
-            f"<p style=\"font-size:16px;line-height:1.5;margin:0 0 12px;\">Videonuz hazırlandı.</p>"
-            f"<p style=\"font-size:14px;color:#555;margin:0 0 16px;\">Dosya adı: <b>{os.path.basename(video_path)}</b></p>"
+            f"<p style=\"font-size:16px; line-height:1.5; margin:0 0 12px;\">Merhaba,</p>"
+            f"<p style=\"font-size:16px; line-height:1.5; margin:0 0 12px;\">Teknofest 2025 (17-21 Eylül) etkinliğinde Demirören Medya dijital standında çekilen videonuz ektedir.</p>"
+            f"<p style=\"font-size:14px; color:#555; margin:0 0 16px;\">Dosya adı: <b>{os.path.basename(video_path)}</b></p>"
         )
         html_body = custom_html_body or _build_branded_email_body(base_body)
 
@@ -2366,7 +2536,24 @@ def start_preview():
 def stop_preview():
     """Kamera önizlemesini durdur"""
     try:
-        stop_camera_preview()
+        # Sadece preview kamerayı durdur, uygulamayı kapatma
+        global PREVIEW_CAMERA, PREVIEW_STOP_EVENT
+        
+        PREVIEW_STOP_EVENT.set()
+        
+        if PREVIEW_CAMERA is not None:
+            try:
+                PREVIEW_CAMERA.release()
+            except Exception as e:
+                print(f"Preview kamera release hatası: {e}")
+            finally:
+                PREVIEW_CAMERA = None
+        
+        # Kısa bekleme - kamera tamamen serbest bırakılsın
+        time.sleep(0.2)
+        
+        print("Web stream kamera durduruldu")
+        
         return jsonify({
             "success": True,
             "message": "Kamera önizlemesi durduruldu"
@@ -2414,9 +2601,7 @@ def start_recording():
             # Kayıt başlat
             record_20_seconds(output_path, with_audio=True)
             RECORD_JOBS[job_key] = {"status": "completed", "output": output_path}
-            print('Kayıt bitti, kamera penceresi kapatılıyor...')
-            # Kayıt tamamlandığında kamerayı kapat
-            stop_fullscreen_camera()
+            print('✅ Kayıt tamamlandı')
             
             # Çeviriyi ayrı thread'de başlat
             print('Çeviri arka planda başlatılıyor...')
@@ -2435,12 +2620,13 @@ def start_recording():
             RECORD_JOBS[job_key]["translation_id"] = translation_id
             
         except Exception as exc:
-            print("Recording error:", exc)
-            # Hata durumunda da kamerayı kapat
+            print("❌ Recording error:", exc)
+            # Hata durumunda da kamerayı hemen kapat
             try:
                 stop_fullscreen_camera()
+                print('📹 Hata durumunda kamera kapatıldı')
             except Exception as cleanup_error:
-                print(f"Cleanup error: {cleanup_error}")
+                print(f"❌ Cleanup error: {cleanup_error}")
             RECORD_JOBS[job_key] = {"status": "error", "output": output_path, "error": str(exc)}
         finally:
             # Thread sonunda temizlik yap
@@ -2528,6 +2714,16 @@ def cleanup_resources():
             cv2.destroyAllWindows()
         except Exception as e:
             print(f"OpenCV cleanup hatası: {e}")
+        
+        # SoundDevice kaynaklarını temizle
+        try:
+            import sounddevice as sd
+            sd.stop()  # Tüm aktif kayıtları durdur
+        except Exception as e:
+            print(f"SoundDevice cleanup hatası: {e}")
+        
+        # Kısa bekleme - kaynakların temizlenmesi için
+        time.sleep(0.5)
         
         print("Kaynaklar temizlendi")
     except Exception as e:

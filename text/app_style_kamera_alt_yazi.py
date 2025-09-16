@@ -299,7 +299,7 @@ def burn_scrolling_text_band(input_mp4: str, output_mp4: str, text: str,
         f"drawbox=x=0:y=640:w=1280:h={band_height}:color=black@{opacity}:t=fill,"
         f"drawtext=textfile='{tmp_txt}':fontcolor=white:fontsize={font_size}"
         + (''.join(fontopt)) +
-        f":x=1280-t*{scroll_speed_px_s}:y=680"
+        f":x=1280-t*{scroll_speed_px_s}:y=670"
     )
 
     cmd = [
@@ -483,7 +483,7 @@ def record_with_opencv_sounddevice_new(output_path: str, device_index: int = 0, 
                     ok_band = burn_scrolling_text_band(
                         muxed_path, banded_path, stt_text,
                         band_height=80, opacity=0.6, font_size=36,
-                        scroll_speed_px_s=180, font_path=font_candidate if os.path.exists(font_candidate) else None,
+                        scroll_speed_px_s=250, font_path=font_candidate if os.path.exists(font_candidate) else None,
                         duration_s=duration_sec
                     )
                     if ok_band:

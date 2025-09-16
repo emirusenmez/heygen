@@ -400,13 +400,205 @@
             0% { transform: translateX(0); }
             100% { transform: translateX(-100%); }
         }
-        /* KVKK bilgilendirme - e-posta alanının hemen altında, silik */
-        .kvkk-note {
-            margin-top: 6px;
+        /* KVKK bilgilendirme - e-posta alanının hemen altında */
+        .kvkk-section {
+            margin-top: 12px;
+        }
+        
+        .kvkk-checkbox-container {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .kvkk-checkbox-container input[type="radio"] {
+            margin: 0;
+            margin-top: 2px;
+            flex-shrink: 0;
+            width: 16px;
+            height: 16px;
+            accent-color: var(--primary);
+        }
+        
+        .kvkk-label {
             font-size: 12px;
             color: var(--muted);
-            opacity: 0.65;
             line-height: 1.4;
+            cursor: pointer;
+            margin: 0;
+        }
+        
+        .kvkk-detail-link {
+            margin-left: 24px;
+        }
+        
+        .kvkk-detail-link a {
+            color: var(--primary);
+            text-decoration: none;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        .kvkk-detail-link a:hover {
+            text-decoration: underline;
+        }
+        
+        .kvkk-error {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding: 8px 12px;
+            background: rgba(244, 63, 94, 0.1);
+            border: 1px solid rgba(244, 63, 94, 0.3);
+            border-radius: 8px;
+            animation: errorShake 0.5s ease-in-out;
+        }
+        
+        .kvkk-error-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .kvkk-error-text {
+            color: #f43f5e;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        
+        @keyframes errorShake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        
+        /* KVKK Modal */
+        .kvkk-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .kvkk-modal-content {
+            background-color: white;
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .kvkk-modal-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-2));
+            color: white;
+            padding: 20px 24px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .kvkk-modal-header h3 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .kvkk-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 28px;
+            cursor: pointer;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            transition: background-color 0.2s ease;
+        }
+        
+        .kvkk-close:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .kvkk-modal-body {
+            padding: 24px;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .kvkk-modal-body h4 {
+            color: var(--primary);
+            margin: 20px 0 10px 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        
+        .kvkk-modal-body h4:first-child {
+            margin-top: 0;
+        }
+        
+        .kvkk-modal-body p {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .kvkk-modal-body ul {
+            margin: 8px 0;
+            padding-left: 20px;
+        }
+        
+        .kvkk-modal-body li {
+            margin: 4px 0;
+            font-size: 14px;
+        }
+        
+        .kvkk-modal-body strong {
+            color: var(--primary);
+        }
+        
+        @media (max-width: 768px) {
+            .kvkk-modal-content {
+                width: 95%;
+                margin: 5% auto;
+            }
+            
+            .kvkk-modal-header {
+                padding: 16px 20px;
+            }
+            
+            .kvkk-modal-header h3 {
+                font-size: 18px;
+            }
+            
+            .kvkk-modal-body {
+                padding: 20px;
+            }
         }
         
         /* Yeni Dil Seçici Tasarımı */
@@ -678,6 +870,12 @@
             
 
             function resetToStart() {
+                // Form alanlarını temizle
+                nameInput.value = '';
+                emailInput.value = '';
+                document.getElementById('kvkk-accept').checked = false;
+                document.getElementById('kvkk-error').style.display = 'none';
+                
                 // Ekranı başa döndür
                 step2.classList.add('hidden');
                 step1.classList.remove('hidden');
@@ -819,13 +1017,13 @@
                         // Sayaçı durdur
                         stopCountdown();
                         recordingStarted = false;
-                        // Tam ekran mesajı 15 saniye göster, sonra reset
+                        // Tam ekran mesajı 30 saniye göster, sonra reset
                         overlayText.textContent = 'Videonuz şu anda hazırlanıyor, görüntülemek için yandaki ekrana geçebilirsiniz.';
-                        overlaySub.textContent = '15 saniye içinde ana ekrana döneceksiniz';
+                        overlaySub.textContent = 'Az sonra ana ekrana döneceksiniz';
                         overlayEl.style.display = 'flex';
                         setTimeout(() => {
                             resetToStart();
-                        }, 15000);
+                        }, 30000);
                     } else if (data.status === 'error') {
                         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
                         // Sayaçı durdur
@@ -842,12 +1040,30 @@
 
             function proceed() {
                 const name = nameInput.value.trim();
+                const kvkkAccepted = document.getElementById('kvkk-accept').checked;
+                const kvkkError = document.getElementById('kvkk-error');
+                
+                // Önceki hataları temizle
+                kvkkError.style.display = 'none';
+                nameInput.style.boxShadow = '';
+                
                 if (!name) {
                     nameInput.focus();
                     nameInput.style.boxShadow = '0 0 0 6px rgba(244, 63, 94, 0.18)';
                     setTimeout(() => nameInput.style.boxShadow = '', 220);
                     return;
                 }
+                
+                if (!kvkkAccepted) {
+                    kvkkError.style.display = 'flex';
+                    // Radio butonun yanına scroll yap
+                    document.getElementById('kvkk-accept').scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center' 
+                    });
+                    return;
+                }
+                
                 question.textContent = `Merhaba ${name}! Çeviri için dil seçiliyor...`;
                 step1.classList.add('hidden');
                 step2.classList.remove('hidden');
@@ -860,7 +1076,6 @@
                 e.preventDefault();
                 proceed();
             });
-            document.getElementById('enter').addEventListener('click', proceed);
 
             startBtn.addEventListener('click', async () => {
                 const name = nameInput.value.trim();
@@ -939,6 +1154,47 @@
                 }
             }
             buildBrandItems();
+            
+            // KVKK Modal fonksiyonları
+            const kvkkModal = document.getElementById('kvkk-modal');
+            const kvkkDetailLink = document.getElementById('kvkk-detail-link');
+            const kvkkClose = document.getElementById('kvkk-close');
+            
+            // Modal açma
+            kvkkDetailLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                kvkkModal.style.display = 'block';
+                document.body.style.overflow = 'hidden'; // Sayfa kaydırmayı engelle
+            });
+            
+            // Modal kapatma
+            kvkkClose.addEventListener('click', () => {
+                kvkkModal.style.display = 'none';
+                document.body.style.overflow = 'auto'; // Sayfa kaydırmayı geri aç
+            });
+            
+            // Modal dışına tıklayınca kapatma
+            kvkkModal.addEventListener('click', (e) => {
+                if (e.target === kvkkModal) {
+                    kvkkModal.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
+            
+            // ESC tuşu ile kapatma
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && kvkkModal.style.display === 'block') {
+                    kvkkModal.style.display = 'none';
+                    document.body.style.overflow = 'auto';
+                }
+            });
+            
+            // KVKK radio buton işaretlendiğinde uyarıyı gizle
+            document.getElementById('kvkk-accept').addEventListener('change', function() {
+                if (this.checked) {
+                    document.getElementById('kvkk-error').style.display = 'none';
+                }
+            });
         });
     </script>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' x2='1' y1='0' y2='1'%3E%3Cstop stop-color='%2322d3ee'/%3E%3Cstop offset='1' stop-color='%23818cf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='44' fill='url(%23g)'/%3E%3C/svg%3E" />
@@ -965,7 +1221,21 @@
                     <input id="email" class="input" type="email" placeholder="E-posta (Videonuzu e-posta olarak gelmesini istiyorsanız doldurabilirsiniz)" autocomplete="email" />
                 </div>
                 <br>
-                <div class="kvkk-note">“Görüntüleriniz yalnızca Demirören Medya’nın Teknofest 2025 etkinliği kapsamında kullanılacak olup, 6698 sayılı KVKK uyarınca üçüncü kişilerle paylaşılmayacak ve başka amaçlarla işlenmeyecektir.”</div>
+                <div class="kvkk-section">
+                    <div class="kvkk-checkbox-container">
+                        <input type="radio" id="kvkk-accept" name="kvkk" value="accept" required>
+                        <label for="kvkk-accept" class="kvkk-label">
+                            "Görüntüleriniz yalnızca Demirören Medya'nın Teknofest 2025 etkinliği kapsamında kullanılacak olup, 6698 sayılı KVKK uyarınca üçüncü kişilerle paylaşılmayacak ve başka amaçlarla işlenmeyecektir."
+                        </label>
+                    </div>
+                    <div class="kvkk-detail-link">
+                        <a href="#" id="kvkk-detail-link">Detaylı bilgilere buradan ulaşabilirsiniz</a>
+                    </div>
+                    <div class="kvkk-error" id="kvkk-error" style="display: none;">
+                        <span class="kvkk-error-icon">⚠️</span>
+                        <span class="kvkk-error-text">Devam etmek için KVKK metnini onaylamanız gerekmektedir.</span>
+                    </div>
+                </div>
             </div>
 
             <div id="step-2" class="step hidden">
@@ -1013,6 +1283,45 @@
         <div class="message">
             <div id="overlay-text" class="headline">Videonuz şu anda hazırlanıyor, görüntülemek için yandaki ekrana geçebilirsiniz.</div>
             <div id="overlay-sub" class="sub">15 saniye içinde ana ekrana döneceksiniz</div>
+        </div>
+    </div>
+
+    <!-- KVKK Detay Modal -->
+    <div id="kvkk-modal" class="kvkk-modal">
+        <div class="kvkk-modal-content">
+            <div class="kvkk-modal-header">
+                <h3>Kişisel Verilerin Korunması Hakkında Bilgilendirme</h3>
+                <button class="kvkk-close" id="kvkk-close">&times;</button>
+            </div>
+            <div class="kvkk-modal-body">
+                <p>Demirören Medya olarak, 6698 sayılı Kişisel Verilerin Korunması Kanunu (KVKK) uyarınca, kişisel verilerinizin güvenliğine en üst düzeyde önem vermekteyiz. Teknofest 2025 etkinliği kapsamında Demirören Medya dijital standında gerçekleştirilen çekimlerde elde edilen görüntü kayıtlarınız, yalnızca etkinlik süresince kullanılmak üzere işlenmektedir.</p>
+                
+                <h4>1. İşleme Amacı</h4>
+                <p>Kişisel verileriniz (görüntü kayıtları), yalnızca Demirören Medya Teknofest 2025 etkinliği çerçevesinde kullanılacak; tanıtım, etkinlik iletişimi ve ilgili organizasyonun sosyal medya hesaplarında paylaşılması amacıyla işlenecektir.</p>
+                
+                <h4>2. Hukuki Dayanak</h4>
+                <p>Verileriniz, KVKK'nın 5. maddesinde belirtilen "ilgili kişinin açık rızasına dayalı olarak veri işlenmesi" hukuki sebebine dayanılarak işlenmektedir.</p>
+                
+                <h4>3. Saklama Süresi</h4>
+                <p>Görüntüleriniz, yalnızca etkinlik süresince ve etkinliğe ilişkin tanıtım faaliyetlerinin yürütülmesi amacıyla saklanacak; bu amaç sona erdiğinde silinecek, yok edilecek veya anonim hale getirilecektir.</p>
+                
+                <h4>4. Üçüncü Kişilere Aktarılmaması</h4>
+                <p>Görüntüleriniz, KVKK ve ilgili mevzuat kapsamında hiçbir şekilde üçüncü kişilerle paylaşılmayacak, yurtiçinde veya yurtdışında başka bir kurum ya da kuruluşa aktarılmayacaktır.</p>
+                
+                <h4>5. Haklarınız</h4>
+                <p>KVKK'nın 11. maddesi kapsamında, kişisel verilerinizle ilgili olarak;</p>
+                <ul>
+                    <li>İşlenip işlenmediğini öğrenme,</li>
+                    <li>İşlenmişse buna ilişkin bilgi talep etme,</li>
+                    <li>İşleme amacını öğrenme ve amacına uygun kullanılıp kullanılmadığını öğrenme,</li>
+                    <li>Verilerin silinmesini veya yok edilmesini talep etme,</li>
+                </ul>
+                <p>haklarına sahipsiniz.</p>
+                <p>Haklarınızı kullanmak için <strong>Demirören Medya İletişim Kanalları</strong> üzerinden bizimle iletişime geçebilirsiniz.</p>
+                
+                <h4>6. Güvenlik</h4>
+                <p>Kişisel verileriniz, KVKK ve ilgili mevzuat çerçevesinde teknik ve idari tedbirlerle korunmakta olup, izinsiz erişim ve kötüye kullanıma karşı gerekli tüm önlemler alınmaktadır.</p>
+            </div>
         </div>
     </div>
     <!-- Brand ticker -->
