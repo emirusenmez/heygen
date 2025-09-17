@@ -985,6 +985,10 @@ def stop_camera_preview():
     """Web stream kamerayı durdur"""
     global PREVIEW_CAMERA, PREVIEW_STOP_EVENT
     
+    # Eğer zaten durdurulmuşsa tekrar durdurma
+    if PREVIEW_CAMERA is None:
+        return
+    
     PREVIEW_STOP_EVENT.set()
     
     if PREVIEW_CAMERA is not None:
@@ -2094,7 +2098,7 @@ def _upload_to_catbox_with_retry(file_path: str, attempts: int = 5, base_backoff
     last_err: Exception | None = None
     for i in range(1, attempts + 1):
         try:
-            timeout = 20.0 if i <= 2 else 45.0
+            timeout = 30.0 if i <= 2 else 60.0
             print(f"catbox.moe yükleme denemesi {i}/{attempts} (timeout={timeout}s)...")
             url = _upload_to_catbox(file_path, timeout=timeout)
             return url
@@ -2773,7 +2777,9 @@ def cleanup_resources():
         for thread in threads_to_clean:
             if thread and thread.is_alive():
                 try:
-                    thread.join(timeout=1)
+                    thread.join(timeout=2)  # Timeout artırıldı
+                    if thread.is_alive():
+                        print(f"⚠️ Thread hala çalışıyor: {thread.name}")
                 except Exception as e:
                     print(f"Thread cleanup hatası: {e}")
         
@@ -2790,8 +2796,15 @@ def cleanup_resources():
         except Exception as e:
             print(f"SoundDevice cleanup hatası: {e}")
         
+        # Multiprocessing kaynaklarını temizle
+        try:
+            import multiprocessing
+            multiprocessing.active_children()  # Aktif child process'leri temizle
+        except Exception as e:
+            print(f"Multiprocessing cleanup hatası: {e}")
+        
         # Kısa bekleme - kaynakların temizlenmesi için
-        time.sleep(0.5)
+        time.sleep(1.0)  # Bekleme süresi artırıldı
         
         print("Kaynaklar temizlendi")
     except Exception as e:
